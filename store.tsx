@@ -1,16 +1,63 @@
 import React, { createContext, useContext } from 'react';
 
 // --- Security Utilities ---
-// تحديث المفاتيح لنسخة (V5 Amnesty) - عفو عام، ولكن القوانين سارية
-export const TIMER_KEY = "__sys_integrity_token_FINAL_v5"; 
-export const BAN_KEY = "__sys_access_violation_FINAL_v5"; 
+// تحديث المفاتيح لنسخة (V6 Strict) - حماية مشددة
+export const TIMER_KEY = "__sys_integrity_token_FINAL_v6"; 
+export const BAN_KEY = "__sys_access_violation_FINAL_v6"; 
 export const ADMIN_KEY = "__sys_root_privilege_token"; 
-const SALT = "besoo_secure_hash_x99_v3_ultra"; 
+export const FINGERPRINT_KEY = "__sys_device_fp_v1";
+const SALT = "besoo_secure_hash_x99_v3_ultra_strict"; 
 
 export class SecureStorage {
+  // --- Fingerprinting Logic ---
+  static async generateFingerprint(): Promise<string> {
+    try {
+        // 1. Canvas Fingerprint
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return "unknown_device";
+        
+        canvas.width = 200;
+        canvas.height = 50;
+        
+        ctx.textBaseline = "top";
+        ctx.font = "14px 'Arial'";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillStyle = "#f60";
+        ctx.fillRect(125,1,62,20);
+        ctx.fillStyle = "#069";
+        ctx.fillText("Besoo_Liker_Secure", 2, 15);
+        ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+        ctx.fillText("Protection", 4, 17);
+        
+        const canvasData = canvas.toDataURL();
+
+        // 2. Hardware Info
+        const screenInfo = `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`;
+        const hardwareConcurrency = navigator.hardwareConcurrency || "unknown";
+        const deviceMemory = (navigator as any).deviceMemory || "unknown";
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const language = navigator.language;
+
+        // 3. Combine & Hash
+        const rawString = `${canvasData}|${screenInfo}|${hardwareConcurrency}|${deviceMemory}|${timezone}|${language}`;
+        
+        // Simple Hash Function (DJB2)
+        let hash = 5381;
+        for (let i = 0; i < rawString.length; i++) {
+            hash = (hash * 33) ^ rawString.charCodeAt(i);
+        }
+        return (hash >>> 0).toString(16);
+
+    } catch (e) {
+        return "fallback_fingerprint_" + Date.now();
+    }
+  }
+
   static encrypt(value: string) {
     try {
       if (typeof window === 'undefined') return "";
+      // Add random component to prevent identical strings looking the same, handled in decrypt
       return btoa(`${value}|${SALT}|${navigator.userAgent.slice(0, 10)}`);
     } catch (e) { return ""; }
   }
@@ -28,7 +75,6 @@ export class SecureStorage {
 
   static setItem(value: string) {
     if (typeof window === 'undefined') return;
-    // إذا كان أدمن، لا تقم بحفظ وقت الانتظار أصلاً
     if (SecureStorage.isAdmin()) return;
 
     const encrypted = SecureStorage.encrypt(value);
@@ -38,7 +84,6 @@ export class SecureStorage {
 
   static getItem(): string | null {
     if (typeof window === 'undefined') return null;
-    // تجاوز كامل للعداد إذا كان المستخدم أدمن
     if (SecureStorage.isAdmin()) return null;
 
     let val = localStorage.getItem(TIMER_KEY);
@@ -63,6 +108,7 @@ export class SecureStorage {
   static removeBan() {
       if (typeof window === 'undefined') return;
       localStorage.removeItem(BAN_KEY);
+      localStorage.removeItem(FINGERPRINT_KEY); // Remove FP ban
       document.cookie = `${BAN_KEY}=; path=/; max-age=0`;
       window.dispatchEvent(new Event("storage"));
   }
@@ -78,24 +124,43 @@ export class SecureStorage {
       return SecureStorage.decrypt(val) === "GRANTED";
   }
 
-  static setBan(timestamp: number) {
+  static async setBan(timestamp: number) {
       if (typeof window === 'undefined') return;
       if (SecureStorage.isAdmin()) return;
 
       const encrypted = SecureStorage.encrypt(timestamp.toString());
+      
+      // 1. Local Storage
       localStorage.setItem(BAN_KEY, encrypted);
+      // 2. Cookie
       document.cookie = `${BAN_KEY}=${encrypted}; path=/; max-age=86400; SameSite=Strict`;
+      
+      // 3. Fingerprint Ban (Strict)
+      const fp = await SecureStorage.generateFingerprint();
+      localStorage.setItem(`${FINGERPRINT_KEY}_${fp}`, encrypted);
   }
 
-  static getBan(): number | null {
+  static async getBan(): Promise<number | null> {
       if (typeof window === 'undefined') return null;
       if (SecureStorage.isAdmin()) return null;
 
+      // Check 1: Fingerprint (Hardest to bypass)
+      const fp = await SecureStorage.generateFingerprint();
+      const fpBan = localStorage.getItem(`${FINGERPRINT_KEY}_${fp}`);
+      if (fpBan) {
+          const decrypted = SecureStorage.decrypt(fpBan);
+          if (decrypted) return parseInt(decrypted);
+      }
+
+      // Check 2: LocalStorage
       let val = localStorage.getItem(BAN_KEY);
+      
+      // Check 3: Cookies
       if (!val) {
           const match = document.cookie.match(new RegExp('(^| )' + BAN_KEY + '=([^;]+)'));
           if (match) val = match[2];
       }
+
       const decrypted = SecureStorage.decrypt(val);
       return decrypted ? parseInt(decrypted) : null;
   }
@@ -143,7 +208,7 @@ const defaultEn = {
     security: { alert: 'Security Alert', desc: 'Action blocked for security reasons.' },
     incognito: { title: "Private Mode", desc: "Close Incognito." },
     ban: { title: "Access Restricted", desc: "Suspicious activity detected.", timer: "Lifted in:" },
-    adblock: { title: "AdBlock Detected", desc: "Disable AdBlock." },
+    adblock: { title: "Security Check Failed", desc: "Please disable AdBlock or Brave Shields to continue." },
     shortener: { title: "Traffic Source Blocked", desc: "Access via URL shorteners (Bitly, Cutly, etc.) is prohibited to prevent abuse. Please open the site directly." }
 };
 
@@ -205,12 +270,12 @@ export const translations = {
     },
     ban: {
         title: "تم حظر الوصول",
-        desc: "تم اكتشاف نشاط مريب. لقد حاولت نسخ الرابط أو تخطي خطوات النظام الإجبارية.",
+        desc: "تم اكتشاف نشاط مريب. لقد حاولت استخدام الموقع مرتين أو تخطي الخطوات.",
         timer: "ينتهي الحظر خلال:"
     },
     adblock: {
-        title: "تم كشف مانع الإعلانات",
-        desc: "نظامنا اكتشف أنك تستخدم مانع إعلانات (AdBlock). يرجى تعطيله للمتابعة واستخدام الخدمة المجانية بشكل آمن."
+        title: "تم كشف حظر الإعلانات",
+        desc: "يرجى تعطيل AdBlock أو Brave Shield للمتابعة. المتصفحات التي تحجب السكربتات غير مدعومة."
     },
     shortener: {
         title: "رابط خارجي محظور",

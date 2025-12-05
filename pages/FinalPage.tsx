@@ -34,19 +34,22 @@ const FinalPage: React.FC = () => {
   }, [navigate]);
 
   useEffect(() => {
-    const savedEndTime = SecureStorage.getItem(); // استخدام المفتاح المشفر
-    if (savedEndTime) {
-      const remaining = Math.round((parseInt(savedEndTime) - Date.now()) / 1000);
-      if (remaining > 0) setTimeLeft(remaining);
-      else SecureStorage.removeItem();
-    }
+    const checkBan = async () => {
+        const savedEndTime = await SecureStorage.getBan(); 
+        if (savedEndTime) {
+            const remaining = Math.round((savedEndTime - Date.now()) / 1000);
+            if (remaining > 0) setTimeLeft(remaining);
+            else SecureStorage.removeBan();
+        }
+    };
+    checkBan();
   }, []);
 
   useEffect(() => {
     if (timeLeft === null) return;
     if (timeLeft <= 0) {
       setTimeLeft(null);
-      SecureStorage.removeItem();
+      SecureStorage.removeBan();
       return;
     }
     const intervalId = setInterval(() => setTimeLeft((prev) => (prev !== null ? prev - 1 : null)), 1000);
@@ -75,14 +78,9 @@ const FinalPage: React.FC = () => {
     return input.replace(/<[^>]*>?/gm, "").trim();
   };
 
-  const getDeviceId = () => {
-      // إنشاء بصمة جهاز بسيطة (بدون مكتبات خارجية ثقيلة)
-      const ua = navigator.userAgent;
-      const screenRes = `${window.screen.width}x${window.screen.height}`;
-      const lang = navigator.language;
-      const rawId = `${ua}-${screenRes}-${lang}`;
-      // تشفير بسيط لتقصير النص
-      return btoa(rawId).slice(0, 20); 
+  const getDeviceId = async () => {
+      // استخدام البصمة الرقمية الآمنة
+      return await SecureStorage.generateFingerprint();
   };
 
   const handleSend = async () => {
@@ -127,13 +125,13 @@ const FinalPage: React.FC = () => {
     const currentCount = storedCount ? parseInt(storedCount) + 1 : 1;
 
     // 4. بصمة الجهاز
-    const deviceId = getDeviceId();
+    const deviceId = await getDeviceId();
 
     // 5. بناء الرسالة بالتنسيق المطلوب
     const messageText = `👑 *${appName}* 👑\n` +
                         `🚀 *طلب جديد*\n` +
                         `👤 *رقم الطلب:* ${currentCount}\n` +
-                        `📱 *معرف الجهاز:* \`${deviceId}\`\n` +
+                        `📱 *بصمة الجهاز:* \`${deviceId}\`\n` +
                         `🔗 *لينك المنشور:*\n\`${cleanLink}\`\n` +
                         `😍 *نوع رياكت:* ${selectedEmojis.join(", ")}\n` +
                         `⏰ *وقت الاستخدام:* ${timeString}`;
@@ -157,8 +155,9 @@ const FinalPage: React.FC = () => {
       const duration = 1200;
       const endTime = Date.now() + duration * 1000;
       
-      // حفظ باستخدام النظام الآمن (لن يتم الحفظ إذا كان أدمن بفضل التعديل في App.tsx)
-      SecureStorage.setItem(endTime.toString());
+      // حفظ باستخدام النظام الآمن (سيتم الحظر بالبصمة أيضاً)
+      // لن يتم الحظر إذا كان المستخدم أدمن
+      await SecureStorage.setBan(endTime);
       
       setTimeLeft(duration);
       setLink('');

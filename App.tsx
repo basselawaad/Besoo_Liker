@@ -118,19 +118,20 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
         }
     };
 
-    // --- REAL-TIME BAN MONITORING ---
+    // --- REAL-TIME BAN MONITORING (With Fingerprint) ---
     useEffect(() => {
         if (isUnlocking || isUnlockUrl || SecureStorage.isAdmin()) return;
 
-        // This function checks the ban status from storage
-        const checkBanStatus = () => {
-             const banTimestamp = SecureStorage.getBan();
+        // This function checks the ban status from storage and fingerprint
+        const checkBanStatus = async () => {
+             const banTimestamp = await SecureStorage.getBan();
              if (banTimestamp) {
                 if (Date.now() < banTimestamp) {
                     setBanState('banned');
                     setBanEndTime(banTimestamp);
                 } else {
-                    localStorage.removeItem(BAN_KEY);
+                    // Ban expired
+                    SecureStorage.removeBan();
                     setBanState('none');
                     setBanEndTime(null);
                 }
@@ -169,17 +170,18 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
 
         // دالة تطبيق الحظر لمدة 24 ساعة
         const applyBan = () => {
-             const existingBan = SecureStorage.getBan();
-             if (existingBan && existingBan > Date.now()) {
-                 setBanState('banned');
-                 setBanEndTime(existingBan);
-             } else {
-                 const banDuration = 24 * 60 * 60 * 1000; // 24 Hours
-                 const endTime = Date.now() + banDuration;
-                 SecureStorage.setBan(endTime);
-                 setBanState('banned');
-                 setBanEndTime(endTime);
-             }
+             const existingBan = SecureStorage.getBan().then(val => {
+                 if (val && val > Date.now()) {
+                     setBanState('banned');
+                     setBanEndTime(val);
+                 } else {
+                     const banDuration = 24 * 60 * 60 * 1000; // 24 Hours
+                     const endTime = Date.now() + banDuration;
+                     SecureStorage.setBan(endTime);
+                     setBanState('banned');
+                     setBanEndTime(endTime);
+                 }
+             });
         };
 
         // 1. Check if running in Iframe
@@ -377,18 +379,24 @@ const App: React.FC = () => {
       setIsAdmin(SecureStorage.isAdmin());
   }, []);
 
-  // AdBlock Detection Logic - Enhanced
+  // AdBlock Detection Logic - Enhanced to catch Brave
   useEffect(() => {
     if (SecureStorage.isAdmin()) return;
 
     const detectAdBlock = async () => {
-       // Method 1: Bait Element
+       // Method 1: Check for Brave Browser explicitly
+       // @ts-ignore
+       if (navigator.brave && await navigator.brave.isBrave()) {
+           setIsAdBlockActive(true);
+           return;
+       }
+
+       // Method 2: Bait Element
        const bait = document.createElement('div');
        bait.className = 'pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads text-ad-links ad-banner adsbox ad-blocker-bait banner_ad';
        bait.style.cssText = 'height: 1px !important; width: 1px !important; position: absolute !important; left: -9999px !important; top: -9999px !important;';
        document.body.appendChild(bait);
 
-       // Check properties
        const checkBait = () => {
            if (
               bait.offsetParent === null || 
@@ -410,7 +418,7 @@ const App: React.FC = () => {
           document.body.removeChild(bait);
        }, 200);
 
-       // Method 2: Network Request Check
+       // Method 3: Network Request Check (Most effective against Brave)
        try {
            await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { 
                method: 'HEAD', 
@@ -423,7 +431,7 @@ const App: React.FC = () => {
 
     detectAdBlock();
 
-    // Continuous Check (Every 2 seconds) to prevent disabling adblock after load
+    // Continuous Check
     const interval = setInterval(detectAdBlock, 2000);
     return () => clearInterval(interval);
   }, []);
