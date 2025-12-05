@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, EyeOff, ShieldAlert, Ban, MonitorX, Link2Off, Clock, Terminal, Code2 } from 'lucide-react';
+
+// تأكد من تطابق أسماء الملفات مع المجلدات
 import Header from './components/Header';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
