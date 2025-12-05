@@ -74,6 +74,22 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
 
     const { t, lang } = useAppConfig();
 
+    // --- REFRESH PROTECTION LOGIC ---
+    useEffect(() => {
+        // التحقق مما إذا كان تحميل الصفحة ناتج عن تحديث (Refresh)
+        // إذا كان كذلك، والصفحة ليست الرئيسية، نعيد المستخدم للبداية
+        try {
+            const navEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
+            if (navEntry && navEntry.type === 'reload' && location.pathname !== '/') {
+                // مسح الجلسة لضمان البدء من الصفر
+                sessionStorage.clear();
+                window.location.replace('/'); // استبدال الرابط بدلاً من التنقل لمنع زر الرجوع
+            }
+        } catch (e) {
+            // Fallback for older browsers
+        }
+    }, []);
+
     // --- ADMIN UNBAN CHECK (IMMEDIATE) ---
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -361,18 +377,20 @@ const App: React.FC = () => {
       setIsAdmin(SecureStorage.isAdmin());
   }, []);
 
-  // AdBlock Detection Logic
+  // AdBlock Detection Logic - Enhanced
   useEffect(() => {
     if (SecureStorage.isAdmin()) return;
 
     const detectAdBlock = async () => {
+       // Method 1: Bait Element
        const bait = document.createElement('div');
-       bait.className = 'pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads text-ad-links ad-banner adsbox ad-blocker-bait';
+       bait.className = 'pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads text-ad-links ad-banner adsbox ad-blocker-bait banner_ad';
        bait.style.cssText = 'height: 1px !important; width: 1px !important; position: absolute !important; left: -9999px !important; top: -9999px !important;';
        document.body.appendChild(bait);
 
-       setTimeout(() => {
-          if (
+       // Check properties
+       const checkBait = () => {
+           if (
               bait.offsetParent === null || 
               bait.offsetHeight === 0 || 
               bait.offsetLeft === 0 || 
@@ -380,15 +398,20 @@ const App: React.FC = () => {
               bait.offsetWidth === 0 || 
               bait.clientHeight === 0 || 
               bait.clientWidth === 0 ||
-              window.getComputedStyle(bait).display === 'none'
+              window.getComputedStyle(bait).display === 'none' ||
+              window.getComputedStyle(bait).visibility === 'hidden'
           ) {
               setIsAdBlockActive(true);
           }
+       };
+
+       setTimeout(() => {
+          checkBait();
           document.body.removeChild(bait);
        }, 200);
 
+       // Method 2: Network Request Check
        try {
-           // Request typically blocked by adblockers
            await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { 
                method: 'HEAD', 
                mode: 'no-cors' 
@@ -399,6 +422,10 @@ const App: React.FC = () => {
     };
 
     detectAdBlock();
+
+    // Continuous Check (Every 2 seconds) to prevent disabling adblock after load
+    const interval = setInterval(detectAdBlock, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   // Incognito Detection
@@ -541,14 +568,14 @@ const App: React.FC = () => {
   // BLOCK SCREEN: AdBlock
   if (isAdBlockActive) {
       return (
-        <div className={`min-h-screen flex flex-col items-center justify-center bg-black text-white p-6 text-center ${lang === 'ar' ? 'rtl' : 'ltr'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+        <div className={`fixed inset-0 z-[99999] min-h-screen flex flex-col items-center justify-center bg-black text-white p-6 text-center ${lang === 'ar' ? 'rtl' : 'ltr'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
             <div className="bg-zinc-900 border border-yellow-500 rounded-3xl p-10 max-w-lg shadow-[0_0_50px_rgba(234,179,8,0.3)]">
                 <MonitorX className="w-20 h-20 text-yellow-500 mx-auto mb-6" />
                 <h1 className="text-3xl font-black text-yellow-500 mb-4">{t.adblock?.title || "Ad Blocker Detected"}</h1>
                 <p className="text-gray-300 text-lg font-bold leading-relaxed mb-6">
                     {t.adblock?.desc || "Please disable your Ad Blocker."}
                 </p>
-                <button onClick={() => window.location.reload()} className="bg-yellow-500 text-black font-black py-3 px-8 rounded-xl hover:bg-yellow-400 transition-colors">
+                <button onClick={() => window.location.reload()} className="bg-yellow-500 text-black font-black py-3 px-8 rounded-xl hover:bg-yellow-400 transition-colors w-full">
                     {t.final?.msg?.react === 'Reaction' ? 'I Disabled It, Reload' : 'قمت بإغلاقه، تحديث الصفحة'}
                 </button>
             </div>

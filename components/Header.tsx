@@ -38,9 +38,10 @@ const Header: React.FC = () => {
   };
 
   const handleShare = async () => {
-      // 1. تحديد الرابط النظيف (بدون صفحات فرعية أو هاش) لضمان بدء الزائر من الصفر
-      // نستخدم href ونزيل كل شيء بعد الهاش، أو نستخدم origin + pathname
-      const urlToShare = `${window.location.origin}${window.location.pathname}`;
+      // SECURITY FIX: 
+      // ننسخ فقط الرابط الرئيسي (الروت) لضمان أن أي شخص يفتح الرابط يبدأ من البداية
+      // هذا يمنع تجاوز الخطوات عن طريق مشاركة رابط صفحة داخلية
+      const urlToShare = window.location.origin;
 
       const shareData = {
           title: 'Besoo Liker',
