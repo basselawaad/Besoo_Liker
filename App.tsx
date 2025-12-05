@@ -1,19 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { HashRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertTriangle, EyeOff, ShieldAlert, Ban, MonitorX, Link2Off, Clock, Terminal, Code2 } from 'lucide-react';
+import { AlertTriangle, EyeOff, ShieldAlert, Ban, MonitorX, Link2Off, Clock, Terminal, Code2, Loader2 } from 'lucide-react';
 
 // تأكد من تطابق أسماء الملفات مع المجلدات
 import Header from './components/Header';
 import Footer from './components/Footer';
-import HomePage from './pages/HomePage';
-import InfoPage from './pages/InfoPage';
-import FAQPage from './pages/FAQPage';
-import TimerPage from './pages/TimerPage';
-import FinalPage from './pages/FinalPage';
+
+// استخدام Lazy Loading لتحسين سرعة تحميل الموقع (Code Splitting)
+const HomePage = React.lazy(() => import('./pages/HomePage'));
+const InfoPage = React.lazy(() => import('./pages/InfoPage'));
+const FAQPage = React.lazy(() => import('./pages/FAQPage'));
+const TimerPage = React.lazy(() => import('./pages/TimerPage'));
+const FinalPage = React.lazy(() => import('./pages/FinalPage'));
 
 // Import shared logic from store to prevent circular dependencies
 import { SecureStorage, translations, AppContext, useAppConfig, Lang, BAN_KEY } from './store';
+
+// --- Loading Spinner Component ---
+const PageLoader = () => (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] w-full text-yellow-500">
+        <Loader2 className="w-16 h-16 animate-spin mb-4 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
+        <p className="font-bold text-lg animate-pulse tracking-widest text-yellow-400/80">LOADING SYSTEM...</p>
+    </div>
+);
 
 // --- COMPONENTS FOR BAN UI ---
 const BanTimerDisplay = ({ targetTime }: { targetTime: number }) => {
@@ -288,25 +298,58 @@ const AnimatedRoutes = () => {
   return (
     <RouteGuard>
         <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/step-1" element={<InfoPage />} />
-            <Route path="/step-2" element={<FAQPage />} />
-            <Route path="/step-3" element={<TimerPage />} />
-            <Route path="/destination" element={<FinalPage />} />
-        </Routes>
+            <Suspense fallback={<PageLoader />}>
+                <Routes location={location} key={location.pathname}>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/step-1" element={<InfoPage />} />
+                    <Route path="/step-2" element={<FAQPage />} />
+                    <Route path="/step-3" element={<TimerPage />} />
+                    <Route path="/destination" element={<FinalPage />} />
+                </Routes>
+            </Suspense>
         </AnimatePresence>
     </RouteGuard>
   );
 };
 
 const App: React.FC = () => {
-  const [lang, setLang] = useState<Lang>('ar');
+  // دالة الكشف التلقائي عن اللغة
+  const getInitialLang = (): Lang => {
+    // 1. التحقق من التخزين المحلي أولاً
+    const storedLang = localStorage.getItem('besoo_app_lang');
+    if (storedLang && translations[storedLang as Lang]) {
+        return storedLang as Lang;
+    }
+
+    // 2. التحقق من لغة المتصفح
+    try {
+        const browserLang = navigator.language.split('-')[0]; // ex: 'ar', 'en'
+        const supportedLangs = ['ar', 'en', 'es', 'fr', 'de', 'pt', 'ru', 'zh'];
+        if (supportedLangs.includes(browserLang)) {
+            return browserLang as Lang;
+        }
+    } catch (e) {}
+
+    // 3. الافتراضي
+    return 'ar';
+  };
+
+  const [lang, setLangState] = useState<Lang>(getInitialLang());
   const [showSecurityWarning, setShowSecurityWarning] = useState(false);
   const [isIncognito, setIsIncognito] = useState(false);
   const [isAdBlockActive, setIsAdBlockActive] = useState(false);
   const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // تحديث اللغة وحفظها
+  const setLang = (newLang: Lang) => {
+      setLangState(newLang);
+      localStorage.setItem('besoo_app_lang', newLang);
+  };
+
+  const toggleLang = () => {
+    setLang(lang === 'ar' ? 'en' : 'ar');
+  };
 
   useEffect(() => {
     document.documentElement.setAttribute('lang', lang);
@@ -324,7 +367,7 @@ const App: React.FC = () => {
 
     const detectAdBlock = async () => {
        const bait = document.createElement('div');
-       bait.className = 'pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads text-ad-links ad-banner adsbox';
+       bait.className = 'pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads text-ad-links ad-banner adsbox ad-blocker-bait';
        bait.style.cssText = 'height: 1px !important; width: 1px !important; position: absolute !important; left: -9999px !important; top: -9999px !important;';
        document.body.appendChild(bait);
 
@@ -345,6 +388,7 @@ const App: React.FC = () => {
        }, 200);
 
        try {
+           // Request typically blocked by adblockers
            await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { 
                method: 'HEAD', 
                mode: 'no-cors' 
@@ -450,10 +494,6 @@ const App: React.FC = () => {
         clearInterval(antiDebugInterval);
     };
   }, []);
-
-  const toggleLang = () => {
-    setLang(prev => prev === 'ar' ? 'en' : 'ar');
-  };
 
   const t = translations[lang] || translations.en;
 

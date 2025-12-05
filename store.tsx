@@ -142,7 +142,7 @@ const defaultEn = {
     },
     security: { alert: 'Security Alert', desc: 'Action blocked for security reasons.' },
     incognito: { title: "Private Mode", desc: "Close Incognito." },
-    ban: { title: "Access Restricted", desc: "Suspicious activity.", timer: "Lifted in:" },
+    ban: { title: "Access Restricted", desc: "Suspicious activity detected.", timer: "Lifted in:" },
     adblock: { title: "AdBlock Detected", desc: "Disable AdBlock." },
     shortener: { title: "Traffic Source Blocked", desc: "Access via URL shorteners (Bitly, Cutly, etc.) is prohibited to prevent abuse. Please open the site directly." }
 };
@@ -218,12 +218,70 @@ export const translations = {
     }
   },
   en: defaultEn,
-  es: { ...defaultEn, header: { home: 'Inicio', contact: 'Contáctenos', share: 'Compartir' }, ban: { title: "Acceso Restringido", desc: "Actividad sospechosa.", timer: "Levantado en:" }, adblock: { title: "AdBlock Detectado", desc: "Desactivar AdBlock." } },
-  fr: { ...defaultEn, header: { ...defaultEn.header, home: 'Accueil' } },
-  de: { ...defaultEn, header: { ...defaultEn.header, home: 'Startseite' } },
-  ru: { ...defaultEn, header: { ...defaultEn.header, home: 'Главная' } },
-  zh: { ...defaultEn, header: { ...defaultEn.header, home: '首页' } },
-  pt: { ...defaultEn, header: { ...defaultEn.header, home: 'Início' } },
+  es: { 
+      ...defaultEn, 
+      header: { home: 'Inicio', contact: 'Contacto', share: 'Compartir' }, 
+      home: { title: 'Besoo Liker', subtitle: '100% Real y Seguro', desc: 'Aumenta tus publicaciones con un clic.', instant: 'Instantáneo', safe: 'Seguro', start: 'Empezar' },
+      info: { pageNum: 'Página 1 de 3', buttonReady: 'Continuar', buttonWait: 'Espera...', welcomeTitle: '⭐ Bienvenido', featuresTitle: '🚀 Características', feat1Title: 'Rápido:', feat1Desc: 'Reacciones reales.', feat2Title: 'Seguro:', feat2Desc: 'Sin contraseña.', feat3Title: 'Fácil:', feat3Desc: 'Interfaz simple.' },
+      faq: { pageNum: 'Página 2 de 3', title: '🌐 ¿Cómo funciona?', step1Title: 'Sin registro', step1Desc: 'Seguro.', step2Title: 'Copiar enlace', step2Desc: 'De la publicación.', step3Title: 'Enviar', step3Desc: 'Elige reacción.', step4Title: 'Resultados', step4Desc: 'Mira el contador.' },
+      timer: { finalStep: 'Paso Final', buttonGet: 'Continuar', buttonPrep: 'Cargando...', ready: '¡Listo!' },
+      final: { placeholder: 'Enlace del post', wait: 'Espera', send: 'Enviar', sending: 'Enviando...', toast: { ...defaultEn.final.toast, success: 'Éxito', error: 'Error', fill: 'Rellenar datos' } },
+      ban: { title: "Acceso Restringido", desc: "Actividad sospechosa.", timer: "Levantado en:" }, 
+      adblock: { title: "AdBlock Detectado", desc: "Desactiva AdBlock." } 
+  },
+  fr: { 
+      ...defaultEn, 
+      header: { home: 'Accueil', contact: 'Contact', share: 'Partager' }, 
+      home: { title: 'Besoo Liker', subtitle: '100% Vrai & Sûr', desc: 'Boostez vos posts en un clic.', instant: 'Instantané', safe: 'Sûr', start: 'Commencer' },
+      info: { pageNum: 'Page 1 sur 3', buttonReady: 'Continuer', buttonWait: 'Attendez...', welcomeTitle: '⭐ Bienvenue', featuresTitle: '🚀 Caractéristiques', feat1Title: 'Rapide:', feat1Desc: 'Réactions réelles.', feat2Title: 'Sûr:', feat2Desc: 'Pas de mot de passe.', feat3Title: 'Facile:', feat3Desc: 'Interface simple.' },
+      faq: { pageNum: 'Page 2 sur 3', title: '🌐 Comment ça marche?', step1Title: 'Pas d\'inscription', step1Desc: 'Sécurisé.', step2Title: 'Copier le lien', step2Desc: 'Du post.', step3Title: 'Envoyer', step3Desc: 'Choisir réaction.', step4Title: 'Résultats', step4Desc: 'Voir le compteur.' },
+      timer: { finalStep: 'Dernière étape', buttonGet: 'Continuer', buttonPrep: 'Chargement...', ready: 'Prêt!' },
+      final: { placeholder: 'Lien du post', wait: 'Attendez', send: 'Envoyer', sending: 'Envoi...', toast: { ...defaultEn.final.toast, success: 'Succès', error: 'Erreur', fill: 'Remplir les données' } },
+      ban: { title: "Accès Restreint", desc: "Activité suspecte.", timer: "Levé dans:" }, 
+      adblock: { title: "AdBlock Détecté", desc: "Désactivez AdBlock." }
+  },
+  de: { 
+      ...defaultEn, 
+      header: { home: 'Startseite', contact: 'Kontakt', share: 'Teilen' },
+      home: { title: 'Besoo Liker', subtitle: '100% Echt & Sicher', desc: 'Booste deine Beiträge mit einem Klick.', instant: 'Sofort', safe: 'Sicher', start: 'Starten' },
+      info: { pageNum: 'Seite 1 von 3', buttonReady: 'Weiter', buttonWait: 'Warten...', welcomeTitle: '⭐ Willkommen', featuresTitle: '🚀 Funktionen', feat1Title: 'Schnell:', feat1Desc: 'Echte Reaktionen.', feat2Title: 'Sicher:', feat2Desc: 'Kein Passwort.', feat3Title: 'Einfach:', feat3Desc: 'Einfache Oberfläche.' },
+      faq: { pageNum: 'Seite 2 von 3', title: '🌐 Wie funktioniert es?', step1Title: 'Keine Anmeldung', step1Desc: 'Sicher.', step2Title: 'Link kopieren', step2Desc: 'Vom Beitrag.', step3Title: 'Senden', step3Desc: 'Reaktion wählen.', step4Title: 'Ergebnisse', step4Desc: 'Zähler beobachten.' },
+      timer: { finalStep: 'Letzter Schritt', buttonGet: 'Weiter', buttonPrep: 'Laden...', ready: 'Bereit!' },
+      final: { placeholder: 'Beitragslink', wait: 'Warten', send: 'Senden', sending: 'Senden...', toast: { ...defaultEn.final.toast, success: 'Erfolg', error: 'Fehler', fill: 'Daten ausfüllen' } },
+      ban: { title: "Zugriff Beschränkt", desc: "Verdächtige Aktivität.", timer: "Aufgehoben in:" }, 
+      adblock: { title: "AdBlock Erkannt", desc: "Deaktiviere AdBlock." }
+  },
+  ru: { 
+      ...defaultEn, 
+      header: { home: 'Главная', contact: 'Контакты', share: 'Поделиться' },
+      home: { title: 'Besoo Liker', subtitle: '100% Реально и Безопасно', desc: 'Продвигайте посты одним кликом.', instant: 'Мгновенно', safe: 'Безопасно', start: 'Начать' },
+      info: { pageNum: 'Страница 1 из 3', buttonReady: 'Продолжить', buttonWait: 'Ждите...', welcomeTitle: '⭐ Добро пожаловать', featuresTitle: '🚀 Особенности', feat1Title: 'Быстро:', feat1Desc: 'Реальные реакции.', feat2Title: 'Безопасно:', feat2Desc: 'Без пароля.', feat3Title: 'Просто:', feat3Desc: 'Простой интерфейс.' },
+      faq: { pageNum: 'Страница 2 из 3', title: '🌐 Как это работает?', step1Title: 'Без регистрации', step1Desc: 'Безопасно.', step2Title: 'Копировать ссылку', step2Desc: 'Поста.', step3Title: 'Отправить', step3Desc: 'Выбрать реакцию.', step4Title: 'Результаты', step4Desc: 'Смотреть счетчик.' },
+      timer: { finalStep: 'Финальный шаг', buttonGet: 'Продолжить', buttonPrep: 'Загрузка...', ready: 'Готово!' },
+      final: { placeholder: 'Ссылка на пост', wait: 'Ждите', send: 'Отправить', sending: 'Отправка...', toast: { ...defaultEn.final.toast, success: 'Успех', error: 'Ошибка', fill: 'Заполните данные' } },
+      ban: { title: "Доступ Ограничен", desc: "Подозрительная активность.", timer: "Снято через:" }, 
+      adblock: { title: "AdBlock Обнаружен", desc: "Отключите AdBlock." }
+  },
+  zh: { 
+      ...defaultEn, 
+      header: { home: '首页', contact: '联系我们', share: '分享' },
+      home: { title: 'Besoo Liker', subtitle: '100% 真实安全', desc: '一键提升帖子热度。', instant: '即时', safe: '安全', start: '开始' },
+      info: { pageNum: '第 1 页，共 3 页', buttonReady: '继续', buttonWait: '请稍候...', welcomeTitle: '⭐ 欢迎', featuresTitle: '🚀以此', feat1Title: '快速:', feat1Desc: '真实反应。', feat2Title: '安全:', feat2Desc: '无需密码。', feat3Title: '简单:', feat3Desc: '界面简洁。' },
+      timer: { finalStep: '最后一步', buttonGet: '继续', buttonPrep: '加载中...', ready: '准备就绪！' },
+      final: { placeholder: '帖子链接', wait: '等待', send: '发送', sending: '发送中...', toast: { ...defaultEn.final.toast, success: '成功', error: '错误', fill: '填写数据' } },
+      ban: { title: "访问受限", desc: "可疑活动。", timer: "解禁时间:" }, 
+      adblock: { title: "检测到广告拦截", desc: "请关闭广告拦截。" }
+  },
+  pt: { 
+      ...defaultEn, 
+      header: { home: 'Início', contact: 'Contato', share: 'Compartilhar' },
+      home: { title: 'Besoo Liker', subtitle: '100% Real e Seguro', desc: 'Impulsione seus posts com um clique.', instant: 'Instantâneo', safe: 'Seguro', start: 'Começar' },
+      info: { pageNum: 'Página 1 de 3', buttonReady: 'Continuar', buttonWait: 'Aguarde...', welcomeTitle: '⭐ Bem-vindo', featuresTitle: '🚀 Recursos', feat1Title: 'Rápido:', feat1Desc: 'Reações reais.', feat2Title: 'Seguro:', feat2Desc: 'Sem senha.', feat3Title: 'Fácil:', feat3Desc: 'Interface simples.' },
+      timer: { finalStep: 'Passo Final', buttonGet: 'Continuar', buttonPrep: 'Carregando...', ready: 'Pronto!' },
+      final: { placeholder: 'Link do post', wait: 'Aguarde', send: 'Enviar', sending: 'Enviando...', toast: { ...defaultEn.final.toast, success: 'Sucesso', error: 'Erro', fill: 'Preencher dados' } },
+      ban: { title: "Acesso Restrito", desc: "Atividade suspeita.", timer: "Liberado em:" }, 
+      adblock: { title: "AdBlock Detectado", desc: "Desative o AdBlock." }
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'es' | 'fr' | 'de' | 'ru' | 'zh' | 'pt';
