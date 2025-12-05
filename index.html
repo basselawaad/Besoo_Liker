@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>Besoo Liker</title>
+    
+    <!-- Favicon: Blue Thumbs Up (Updated) -->
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/1533/1533913.png?v=2" type="image/png" />
+    <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/1533/1533913.png?v=2" type="image/png" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1533/1533913.png?v=2" />
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+      :root {
+        --accent-300: 253 224 71;
+        --accent-400: 250 204 21;
+        --accent-500: 234 179 8;
+        --accent-600: 202 138 4;
+        --bg-primary: 0 0 0;
+        --bg-secondary: 9 9 11;
+      }
+      body {
+        background-color: #000000;
+        color: rgb(var(--accent-400));
+        font-family: 'Cairo', sans-serif;
+        overflow-x: hidden;
+        /* منع تحديد النصوص بالكامل */
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+      }
+      *, *::before, *::after {
+        transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow, transform, opacity;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 300ms;
+      }
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: rgb(var(--bg-primary)); }
+      ::-webkit-scrollbar-thumb { background: rgb(var(--accent-500)); border-radius: 4px; }
+      
+      /* Utilities */
+      .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(234, 179, 8, 0.3); border-radius: 10px; }
+    </style>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: { sans: ['Cairo', 'sans-serif'] },
+            colors: {
+              yellow: {
+                300: 'rgb(var(--accent-300) / <alpha-value>)',
+                400: 'rgb(var(--accent-400) / <alpha-value>)',
+                500: 'rgb(var(--accent-500) / <alpha-value>)',
+                600: 'rgb(var(--accent-600) / <alpha-value>)',
+              }
+            }
+          }
+        }
+      }
+    </script>
+<script type="importmap">
+{
+  "imports": {
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.10.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.25"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
