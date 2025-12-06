@@ -3,11 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
 import { useAppConfig } from '../store';
-import { supabase } from '../supabaseClient'; // استدعاء عميل Supabase
+import { supabase } from '../supabaseClient'; 
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { t, login, lang } = useAppConfig();
+  const { t, lang } = useAppConfig();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,36 +23,44 @@ const LoginPage: React.FC = () => {
     }
 
     setLoading(true);
-    // Simulate network delay for regular login
-    setTimeout(async () => {
-        const success = await login(email, password);
-        if (success) {
-            navigate('/');
-        } else {
-            setError(t.auth.errorInvalid);
-            setLoading(false);
+    
+    try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password
+        });
+
+        if (error) {
+            // Check if it's an "Email not confirmed" error
+            if (error.message.includes('Email not confirmed')) {
+                throw new Error("Please verify your email first.");
+            }
+            throw error;
         }
-    }, 1000);
+
+        if (data.session) {
+            navigate('/');
+        }
+    } catch (err: any) {
+        setError(err.message || t.auth.errorInvalid);
+    } finally {
+        setLoading(false);
+    }
   };
 
-  // 💥 دالة تسجيل الدخول عبر جوجل باستخدام Supabase 💥
   const handleGoogleSignIn = async () => {
       setLoading(true);
-      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-            // العودة إلى الرابط المحدد في Google Cloud Console
             redirectTo: 'https://besooliker.vercel.app/home', 
         }
       });
 
       if (error) {
-          console.error('Google login failed:', error.message);
           setError(error.message);
           setLoading(false);
       }
-      // لا حاجة لـ setLoading(false) في حالة النجاح لأن Supabase سيعيد توجيه الصفحة
   };
 
   return (
@@ -61,37 +69,41 @@ const LoginPage: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       className="w-full max-w-md"
     >
-      <div className="bg-zinc-950/80 backdrop-blur-md rounded-3xl p-8 shadow-[0_0_30px_rgba(234,179,8,0.15)] border border-yellow-600/30 text-center">
+      <div className="bg-zinc-950/90 backdrop-blur-md rounded-[28px] p-8 md:p-12 shadow-[0_0_40px_rgba(234,179,8,0.1)] border border-yellow-600/20 text-center">
         
-        <div className="mb-6 flex justify-center">
-            <div className="bg-yellow-400/10 p-4 rounded-full border border-yellow-400/30">
-                <LogIn className="w-8 h-8 text-yellow-400" />
+        <div className="mb-6 flex flex-col items-center">
+            <div className="w-16 h-16 mb-4 flex items-center justify-center">
+                 <img src="https://cdn-icons-png.flaticon.com/512/1533/1533913.png?v=2" alt="Logo" className="w-12 h-12 object-contain" />
             </div>
+            <h1 className="text-2xl font-black text-yellow-400">{t.auth.loginTitle}</h1>
+            <p className="text-gray-400 text-sm mt-2">Welcome back to Besoo Liker</p>
         </div>
 
-        <h1 className="text-2xl font-black text-yellow-400 mb-6">{t.auth.loginTitle}</h1>
-
-        <form onSubmit={handleSubmit} className="space-y-4" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-            <div className="relative">
-                <Mail className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 ${lang === 'ar' ? 'right-4' : 'left-4'}`} />
+        <form onSubmit={handleSubmit} className="space-y-6" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+             <div className="relative group text-left rtl:text-right">
                 <input 
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={t.auth.email}
-                    className={`w-full bg-black/50 border border-gray-700 rounded-xl py-3 text-white focus:border-yellow-400 focus:outline-none transition-colors ${lang === 'ar' ? 'pr-12 pl-4' : 'pl-12 pr-4'}`}
+                    placeholder=" "
+                    className="block px-4 py-3.5 w-full text-white bg-transparent rounded-lg border border-gray-600 appearance-none focus:outline-none focus:ring-0 focus:border-yellow-400 peer transition-colors"
                 />
+                <label className={`absolute text-sm text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-zinc-950 px-2 peer-focus:px-2 peer-focus:text-yellow-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 ${lang === 'ar' ? 'right-3' : 'left-3'}`}>
+                    {t.auth.email}
+                </label>
             </div>
             
-            <div className="relative">
-                <Lock className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 ${lang === 'ar' ? 'right-4' : 'left-4'}`} />
+             <div className="relative group text-left rtl:text-right">
                 <input 
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder={t.auth.password}
-                    className={`w-full bg-black/50 border border-gray-700 rounded-xl py-3 text-white focus:border-yellow-400 focus:outline-none transition-colors ${lang === 'ar' ? 'pr-12 pl-4' : 'pl-12 pr-4'}`}
+                    placeholder=" "
+                    className="block px-4 py-3.5 w-full text-white bg-transparent rounded-lg border border-gray-600 appearance-none focus:outline-none focus:ring-0 focus:border-yellow-400 peer transition-colors"
                 />
+                <label className={`absolute text-sm text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-zinc-950 px-2 peer-focus:px-2 peer-focus:text-yellow-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 ${lang === 'ar' ? 'right-3' : 'left-3'}`}>
+                    {t.auth.password}
+                </label>
             </div>
 
             {error && (
@@ -101,20 +113,31 @@ const LoginPage: React.FC = () => {
                 </div>
             )}
 
-            <button 
-                type="submit"
-                disabled={loading}
-                className="w-full bg-yellow-400 text-black font-black py-3 rounded-xl hover:bg-yellow-300 transition-colors disabled:opacity-50"
-            >
-                {loading ? t.system.loading : t.auth.loginBtn}
-            </button>
+            <div className="flex justify-end">
+                <button type="button" className="text-yellow-400 text-sm font-bold hover:underline">
+                    Forgot password?
+                </button>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+                 <Link to="/signup" className="text-yellow-400 text-sm font-bold hover:bg-yellow-400/10 px-4 py-2 rounded-lg transition-colors">
+                    {t.auth.signupBtn}
+                 </Link>
+                 <button 
+                    type="submit"
+                    disabled={loading}
+                    className="bg-yellow-400 text-black font-bold py-2.5 px-8 rounded-full hover:bg-yellow-300 transition-colors disabled:opacity-50"
+                >
+                    {loading ? "..." : t.auth.loginBtn}
+                </button>
+            </div>
             
-            <div className="relative my-4">
+            <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-gray-800"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-transparent text-gray-500 font-bold bg-[#09090b]">OR</span>
+                    <span className="px-2 bg-zinc-950 text-gray-500 font-bold">OR</span>
                 </div>
             </div>
 
@@ -122,7 +145,7 @@ const LoginPage: React.FC = () => {
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={loading}
-                className="w-full bg-white text-black font-bold py-3 rounded-xl hover:bg-gray-100 transition-colors flex items-center justify-center gap-3 disabled:opacity-70"
+                className="w-full bg-white text-black font-bold py-3 rounded-full hover:bg-gray-100 transition-colors flex items-center justify-center gap-3 disabled:opacity-70 border border-gray-200"
             >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -134,10 +157,6 @@ const LoginPage: React.FC = () => {
             </button>
 
         </form>
-
-        <div className="mt-6 text-sm text-gray-400">
-            {t.auth.noAccount} <Link to="/signup" className="text-yellow-400 font-bold hover:underline">{t.auth.signupBtn}</Link>
-        </div>
 
       </div>
     </motion.div>

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from './supabaseClient'; 
 
 // --- Telegram Configuration ---
 export const TG_BOT_TOKEN = "8282477678:AAElPQVX-xemNjC79ojZfQLMpTxOzXXWRVE";
@@ -13,39 +14,6 @@ export const AUTH_SESSION_KEY = "besoo_auth_session_v1";
 export const USERS_DB_KEY = "besoo_users_db_v1";
 
 const SALT = "besoo_secure_hash_x99_v4_ultra_strict"; 
-
-// --- Centralized Telegram Logger ---
-export const sendTelegramLog = async (status: 'BANNED' | 'GOOD_USER' | 'WARNING' | 'NEW_USER' | 'LOGIN', reason: string, details: string = "") => {
-    try {
-        const logKey = `tg_log_sent_${status}_${reason.replace(/\s/g, '')}_${Date.now()}`; // Unique key per event
-
-        const deviceId = await SecureStorage.generateFingerprint();
-        const now = new Date().toLocaleString('ar-EG');
-        
-        let emoji = "✅";
-        if (status === 'BANNED') emoji = "🚫";
-        if (status === 'WARNING') emoji = "⚠️";
-        if (status === 'NEW_USER') emoji = "👤";
-        if (status === 'LOGIN') emoji = "🔑";
-
-        const message = `🛡️ *نظام الحماية - Besoo Liker*\n\n` +
-                        `${emoji} *الحالة:* ${status}\n` +
-                        `📝 *الحدث:* ${reason}\n` +
-                        `📱 *بصمة الجهاز:* \`${deviceId}\`\n` +
-                        `⏰ *التوقيت:* ${now}\n` +
-                        `${details ? `📄 *تفاصيل:* ${details}` : ''}`;
-
-        const params = new URLSearchParams({
-            chat_id: TG_CHAT_ID,
-            text: message,
-            parse_mode: 'Markdown'
-        });
-
-        await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage?${params.toString()}`, { mode: 'no-cors' });
-    } catch (e) {
-        console.error("Log Error", e);
-    }
-};
 
 // --- IndexedDB Helper for Persistent Ban ---
 const DB_NAME = 'BesooSystemDB';
@@ -85,7 +53,6 @@ async function readDB(key: string): Promise<string | undefined> {
 }
 
 export class SecureStorage {
-  // ... (Fingerprint methods same as before)
   static async getAudioFingerprint(): Promise<string> {
       try {
           const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -291,16 +258,47 @@ export class SecureStorage {
     }
 }
 
-// --- Translations Definition ---
+// --- Centralized Telegram Logger ---
+export const sendTelegramLog = async (status: 'BANNED' | 'GOOD_USER' | 'WARNING' | 'NEW_USER' | 'LOGIN', reason: string, details: string = "") => {
+    try {
+        const deviceId = await SecureStorage.generateFingerprint();
+        const now = new Date().toLocaleString('ar-EG');
+        
+        let emoji = "✅";
+        if (status === 'BANNED') emoji = "🚫";
+        if (status === 'WARNING') emoji = "⚠️";
+        if (status === 'NEW_USER') emoji = "👤";
+        if (status === 'LOGIN') emoji = "🔑";
+
+        const message = `🛡️ *نظام الحماية - Besoo Liker*\n\n` +
+                        `${emoji} *الحالة:* ${status}\n` +
+                        `📝 *الحدث:* ${reason}\n` +
+                        `📱 *بصمة الجهاز:* \`${deviceId}\`\n` +
+                        `⏰ *التوقيت:* ${now}\n` +
+                        `${details ? `📄 *تفاصيل:* ${details}` : ''}`;
+
+        const params = new URLSearchParams({
+            chat_id: TG_CHAT_ID,
+            text: message,
+            parse_mode: 'Markdown'
+        });
+
+        await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage?${params.toString()}`, { mode: 'no-cors' });
+    } catch (e) {
+        console.error("Log Error", e);
+    }
+};
+
 const AR_TRANSLATIONS = {
     system: { loading: 'جاري تحميل النظام...', connect: 'جاري تهيئة الاتصال...', protection: 'نظام الحماية نشط', wait: 'يجب الانتظار قبل الطلب الجديد', copy: 'تم نسخ الرابط' },
     auth: {
-        loginTitle: "تسجيل الدخول", signupTitle: "إنشاء حساب جديد", email: "البريد الإلكتروني", password: "كلمة المرور", 
+        loginTitle: "تسجيل الدخول", signupTitle: "إنشاء حساب", email: "البريد الإلكتروني", password: "كلمة المرور", 
         confirmPassword: "تأكيد كلمة المرور", name: "الاسم الكامل",
-        loginBtn: "دخول", signupBtn: "تسجيل", noAccount: "ليس لديك حساب؟", haveAccount: "لديك حساب بالفعل؟",
+        loginBtn: "دخول", signupBtn: "التالي", noAccount: "ليس لديك حساب؟", haveAccount: "لديك حساب بالفعل؟",
         errorEmpty: "يرجى ملء جميع الحقول", errorMatch: "كلمات المرور غير متطابقة", errorExists: "البريد الإلكتروني مسجل مسبقاً",
         errorInvalid: "البريد الإلكتروني أو كلمة المرور غير صحيحة", successSignup: "تم إنشاء الحساب بنجاح", logout: "تسجيل خروج",
-        googleBtn: "تسجيل الدخول باستخدام جوجل"
+        googleBtn: "تسجيل الدخول باستخدام جوجل",
+        verifyTitle: "إثبات ملكية البريد", verifyText: "أدخل الرمز الذي تم إرساله إلى بريدك الإلكتروني", verifyCode: "أدخل الرمز", verifyBtn: "تأكيد", resend: "إعادة إرسال"
     },
     header: { home: 'الرئيسية', contact: 'اتصل بنا', share: 'مشاركة الموقع', shareTitle: 'زيادة لايكات فيسبوك مجاناً', shareText: '🚀 أقوى موقع لزيادة لايكات فيسبوك مجاناً! \n💯 تفاعل حقيقي ومضمون 100% \n🔒 آمن تماماً وبدون كلمة سر \nجربه الآن 👇' },
     footer: {
@@ -380,10 +378,11 @@ const EN_TRANSLATIONS = {
     auth: {
         loginTitle: "Login", signupTitle: "Create Account", email: "Email Address", password: "Password", 
         confirmPassword: "Confirm Password", name: "Full Name",
-        loginBtn: "Login", signupBtn: "Sign Up", noAccount: "Don't have an account?", haveAccount: "Already have an account?",
+        loginBtn: "Login", signupBtn: "Next", noAccount: "Don't have an account?", haveAccount: "Already have an account?",
         errorEmpty: "Please fill all fields", errorMatch: "Passwords do not match", errorExists: "Email already exists",
         errorInvalid: "Invalid Email or Password", successSignup: "Account created successfully", logout: "Logout",
-        googleBtn: "Sign in with Google"
+        googleBtn: "Sign in with Google",
+        verifyTitle: "Verify your email", verifyText: "Enter the 6-digit code sent to your email", verifyCode: "Enter Code", verifyBtn: "Verify", resend: "Resend Code"
     },
     header: { home: 'Home', contact: 'Contact Us', share: 'Share Website', shareTitle: 'Free Facebook Likes', shareText: '🚀 Best site to increase Facebook Likes for FREE! \n💯 100% Real & Safe Engagement \n🔒 No Password Required \nTry it now 👇' },
     footer: {
@@ -452,13 +451,12 @@ const EN_TRANSLATIONS = {
 export const translations = {
   ar: AR_TRANSLATIONS,
   en: EN_TRANSLATIONS,
-  // Add simplified fallbacks for other languages to avoid errors, pointing to English structure usually
-  es: { ...EN_TRANSLATIONS, auth: { loginTitle: "Iniciar Sesión", signupTitle: "Crear Cuenta", email: "Correo", password: "Clave", confirmPassword: "Confirmar Clave", name: "Nombre", loginBtn: "Entrar", signupBtn: "Registrar", noAccount: "¿No tienes cuenta?", haveAccount: "¿Ya tienes cuenta?", errorEmpty: "Llenar todo", errorMatch: "Claves no coinciden", errorExists: "Correo existe", errorInvalid: "Invalido", successSignup: "Éxito", logout: "Salir", googleBtn: "Iniciar con Google" } } as any,
-  fr: { ...EN_TRANSLATIONS, auth: { loginTitle: "Connexion", signupTitle: "Créer Compte", email: "Email", password: "Mot de passe", confirmPassword: "Confirmer", name: "Nom", loginBtn: "Entrar", signupBtn: "Inscrire", noAccount: "Pas de compte ?", haveAccount: "Déjà un compte ?", errorEmpty: "Remplir tout", errorMatch: "Pas identique", errorExists: "Existe déjà", errorInvalid: "Invalide", successSignup: "Succès", logout: "Déconnexion", googleBtn: "Continuer avec Google" } } as any,
-  de: { ...EN_TRANSLATIONS, auth: { loginTitle: "Anmelden", signupTitle: "Konto erstellen", email: "Email", password: "Pass", confirmPassword: "Bestätigen", name: "Name", loginBtn: "Login", signupBtn: "Registrieren", noAccount: "Kein Konto?", haveAccount: "Haben Konto?", errorEmpty: "Alles ausfüllen", errorMatch: "Nicht gleich", errorExists: "Existiert", errorInvalid: "Ungültig", successSignup: "Erfolg", logout: "Logout", googleBtn: "Mit Google anmelden" } } as any,
-  ru: { ...EN_TRANSLATIONS, auth: { loginTitle: "Вход", signupTitle: "Создать", email: "Email", password: "Пароль", confirmPassword: "Подтвердить", name: "Имя", loginBtn: "Вход", signupBtn: "Рег.", noAccount: "Нет аккаунта?", haveAccount: "Есть аккаунт?", errorEmpty: "Заполните", errorMatch: "Не совпадает", errorExists: "Существует", errorInvalid: "Ошибка", successSignup: "Успех", logout: "Выход", googleBtn: "Войти через Google" } } as any,
-  zh: { ...EN_TRANSLATIONS, auth: { loginTitle: "登录", signupTitle: "注册", email: "邮箱", password: "密码", confirmPassword: "确认密码", name: "姓名", loginBtn: "登录", signupBtn: "注册", noAccount: "没有账号？", haveAccount: "已有账号？", errorEmpty: "填满", errorMatch: "不匹配", errorExists: "已存在", errorInvalid: "无效", successSignup: "成功", logout: "登出", googleBtn: "通过 Google 登录" } } as any,
-  pt: { ...EN_TRANSLATIONS, auth: { loginTitle: "Login", signupTitle: "Criar Conta", email: "Email", password: "Senha", confirmPassword: "Confirmar", name: "Nome", loginBtn: "Entrar", signupBtn: "Registrar", noAccount: "Sem conta?", haveAccount: "Tem conta?", errorEmpty: "Preencher", errorMatch: "Não combina", errorExists: "Existe", errorInvalid: "Inválido", successSignup: "Sucesso", logout: "Sair", googleBtn: "Entrar com Google" } } as any,
+  es: { ...EN_TRANSLATIONS } as any,
+  fr: { ...EN_TRANSLATIONS } as any,
+  de: { ...EN_TRANSLATIONS } as any,
+  ru: { ...EN_TRANSLATIONS } as any,
+  zh: { ...EN_TRANSLATIONS } as any,
+  pt: { ...EN_TRANSLATIONS } as any,
 };
 
 export type Lang = 'ar' | 'en' | 'es' | 'fr' | 'de' | 'ru' | 'zh' | 'pt';
@@ -467,7 +465,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  password: string; // In a real app, hash this!
+  password: string; 
   createdAt: number;
 }
 
@@ -480,7 +478,15 @@ interface AuthContextType {
   isAuthenticated: boolean;
 }
 
-// --- Auth Context Implementation ---
+export interface AppContextType {
+  lang: Lang;
+  setLang: (lang: Lang) => void;
+  toggleLang: () => void;
+  isAdmin: boolean;
+  t: typeof EN_TRANSLATIONS;
+}
+
+// --- Contexts ---
 export const AuthContext = createContext<AuthContextType>({
   currentUser: null,
   login: async () => false,
@@ -490,99 +496,68 @@ export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
 });
 
+export const AppContext = createContext<AppContextType>({
+  lang: 'ar',
+  setLang: () => {},
+  toggleLang: () => {},
+  isAdmin: false,
+  t: AR_TRANSLATIONS,
+});
+
+// --- Auth Provider ---
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-    // Load session on mount
     useEffect(() => {
-        const storedSession = localStorage.getItem(AUTH_SESSION_KEY);
-        if (storedSession) {
-            try {
-                const user = JSON.parse(storedSession);
+        // Check active session on mount
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+                const user: User = {
+                    id: session.user.id,
+                    name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || "User",
+                    email: session.user.email || "",
+                    password: "",
+                    createdAt: Date.now()
+                };
                 setCurrentUser(user);
-            } catch (e) {
+            }
+        });
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                 const user: User = {
+                    id: session.user.id,
+                    name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || "User",
+                    email: session.user.email || "",
+                    password: "",
+                    createdAt: Date.now()
+                };
+                setCurrentUser(user);
+                localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(user));
+            } else {
+                setCurrentUser(null);
                 localStorage.removeItem(AUTH_SESSION_KEY);
             }
-        }
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
-    const getUsersDB = (): User[] => {
-        const db = localStorage.getItem(USERS_DB_KEY);
-        return db ? JSON.parse(db) : [];
-    };
-
-    const saveUsersDB = (users: User[]) => {
-        localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
-    };
-
     const login = async (email: string, pass: string): Promise<boolean> => {
-        const users = getUsersDB();
-        const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === pass);
-        
-        if (user) {
-            setCurrentUser(user);
-            localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(user));
-            sendTelegramLog('LOGIN', 'User Logged In', `Email: ${email}`);
-            return true;
-        }
-        return false;
+        return true; 
     };
 
     const signup = async (name: string, email: string, pass: string): Promise<boolean> => {
-        const users = getUsersDB();
-        if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
-            return false; // User exists
-        }
-
-        const newUser: User = {
-            id: 'user_' + Date.now(),
-            name,
-            email,
-            password: pass,
-            createdAt: Date.now()
-        };
-
-        users.push(newUser);
-        saveUsersDB(users);
-        
-        // Auto login after signup
-        setCurrentUser(newUser);
-        localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(newUser));
-        sendTelegramLog('NEW_USER', 'New Account Created', `Email: ${email}\nName: ${name}`);
         return true;
     };
 
-    // Simulated Google OAuth Flow
     const loginWithGoogle = async (): Promise<boolean> => {
-        sendTelegramLog('LOGIN', 'Google Auth Initiated');
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                const users = getUsersDB();
-                let user = users.find(u => u.email === 'google_user@gmail.com');
-                
-                // If user doesn't exist (first time), create them
-                if (!user) {
-                    user = {
-                        id: 'user_google_' + Date.now(),
-                        name: 'Google User',
-                        email: 'google_user@gmail.com',
-                        password: '', // OAuth users often don't have a password in local DB
-                        createdAt: Date.now()
-                    };
-                    users.push(user);
-                    saveUsersDB(users);
-                    sendTelegramLog('NEW_USER', 'Google Account Created (Simulated)', 'Email: google_user@gmail.com');
-                }
-                
-                setCurrentUser(user);
-                localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(user));
-                sendTelegramLog('LOGIN', 'Google Auth Success', 'Email: google_user@gmail.com');
-                resolve(true);
-            }, 1200); // Simulate network delay
-        });
+        return true;
     };
 
-    const logout = () => {
+    const logout = async () => {
+        await supabase.auth.signOut();
         setCurrentUser(null);
         localStorage.removeItem(AUTH_SESSION_KEY);
     };
@@ -594,25 +569,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 };
 
-// --- Main App Context ---
-interface AppContextType {
-  lang: Lang;
-  setLang: (lang: Lang) => void;
-  toggleLang: () => void;
-  isAdmin: boolean;
-  t: typeof translations.ar;
-}
-
-export const AppContext = createContext<AppContextType>({
-  lang: 'ar',
-  setLang: () => {},
-  toggleLang: () => {},
-  isAdmin: false,
-  t: translations.ar,
-});
-
+// --- Hook ---
 export const useAppConfig = () => {
-    const appCtx = useContext(AppContext);
     const authCtx = useContext(AuthContext);
-    return { ...appCtx, ...authCtx };
+    const appCtx = useContext(AppContext);
+    return { ...authCtx, ...appCtx };
 };
