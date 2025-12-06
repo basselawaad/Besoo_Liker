@@ -96,26 +96,27 @@ const FinalPage: React.FC = () => {
         return; 
     }
 
-    // 3. Incognito Check
+    // 3. Incognito Check - Actual Ban Enforcement
     const isIncognito = await SecureStorage.isIncognitoMode();
     if (isIncognito && !isAdmin) {
         setLoading(false);
         showToast("Incognito Mode Not Allowed", "error");
-        // الحظر هنا مقبول لأنه مخالفة صريحة
-        const endTime = Date.now() + 86400000;
+        // حظر فعلي عند محاولة الإرسال من المتصفح الخفي
+        const endTime = Date.now() + (24 * 60 * 60 * 1000); // 24 hours
         await SecureStorage.setBan(endTime);
         sendTelegramLog('BANNED', 'Incognito Mode on Submission');
         window.location.reload();
         return; 
     }
 
-    // 4. AdBlock Check
+    // 4. AdBlock Check (Warning only, no ban)
     try {
         await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { method: 'HEAD', mode: 'no-cors' });
     } catch (e) {
         if (!isAdmin) {
             setLoading(false);
             showToast(t.adblock?.title || "AdBlock Detected", "error");
+            // No ban here, just preventing submission
             return; 
         }
     }
@@ -138,11 +139,11 @@ const FinalPage: React.FC = () => {
     const currentCount = localStorage.getItem('besoo_user_request_count');
     const nextCount = currentCount ? parseInt(currentCount) + 1 : 1;
 
-    // Build the Telegram Message Details as requested: Link and Reaction Type
-    const details = `👤 *رقم الطلب:* ${nextCount}\n` +
-                    `📧 *المستخدم:* ${currentUser ? currentUser.email : "Unknown"}\n` +
-                    `🔗 *لينك المنشور:*\n\`${cleanLink}\`\n` +
-                    `😍 *نوع رياكت:* ${selectedEmojis.join(", ")}`;
+    // Build Telegram Message - Specific Format Requested
+    const details = `👤 *طلب جديد (رقم ${nextCount})*\n` +
+                    `📧 *الجيميل:* \`${currentUser ? currentUser.email : "غير مسجل"}\`\n` +
+                    `😍 *نوع التفاعل:* ${selectedEmojis.join(", ")}\n` +
+                    `🔗 *الرابط:* \`${cleanLink}\``;
 
     try {
       await sendTelegramLog('GOOD_USER', 'Successful Request', details);
@@ -153,7 +154,7 @@ const FinalPage: React.FC = () => {
       const duration = 1200; // 20 دقيقة
       const endTime = Date.now() + duration * 1000;
       
-      SecureStorage.setItem(endTime.toString()); // استخدام مخزن المؤقت وليس الحظر
+      SecureStorage.setItem(endTime.toString()); // استخدام مخزن المؤقت
       
       setTimeLeft(duration);
       setLink('');

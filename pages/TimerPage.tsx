@@ -39,16 +39,21 @@ const TimerPage: React.FC = () => {
       exit={{ opacity: 0, scale: 0.95 }}
       className="w-full max-w-lg"
     >
+      <div className="flex flex-col items-center mb-6">
+         <h1 className="text-4xl font-black text-green-500 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)] tracking-wide">Besoo Liker</h1>
+         <p className="text-gray-400 text-sm font-bold tracking-widest mt-1">DOWNLOAD LINK</p>
+      </div>
+
       <div className="bg-zinc-950/90 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-green-500/20 relative overflow-hidden flex flex-col items-center text-center">
         
         {/* Header */}
         <div className="w-full flex items-center justify-between mb-8 border-b border-zinc-800 pb-4">
              <div className="flex items-center gap-2">
                  <LinkIcon className="w-5 h-5 text-green-500" />
-                 <span className="font-black text-white text-lg tracking-wide">Besoo Liker</span>
+                 <span className="font-bold text-gray-300 text-sm tracking-wide">Final Step</span>
              </div>
-             <span className="text-xs font-bold bg-green-500/10 text-green-500 px-3 py-1 rounded-full border border-green-500/20">
-                {t.shortener?.step3 || "Final Step"}
+             <span className="text-xs font-black bg-green-500/10 text-green-500 px-3 py-1 rounded-full border border-green-500/20">
+                {t.shortener?.step3 || "Step 3/3"}
              </span>
         </div>
 

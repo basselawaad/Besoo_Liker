@@ -21,7 +21,6 @@ import { SecureStorage, translations, AppContext, AuthProvider, useAppConfig, La
 
 // --- Loading Spinner Component ---
 const PageLoader = () => {
-    // We handle t inside safely
     return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] w-full text-yellow-500">
             <Loader2 className="w-16 h-16 animate-spin mb-4 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
@@ -32,16 +31,13 @@ const PageLoader = () => {
 
 // --- COMPONENTS FOR BAN UI ---
 const BanTimerDisplay = ({ targetTime }: { targetTime: number }) => {
-    // Initial calculation
     const calculateTimeLeft = () => Math.max(0, targetTime - Date.now());
     const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
 
     useEffect(() => {
-        // Update timer every second
         const timer = setInterval(() => {
             const remaining = calculateTimeLeft();
             if (remaining <= 0) {
-                // If ban is over, reload to clear the state
                 window.location.reload();
             } else {
                 setTimeLeft(remaining);
@@ -67,13 +63,14 @@ const BanTimerDisplay = ({ targetTime }: { targetTime: number }) => {
 
 // --- AUTH GUARD ---
 const RequireAuth = ({ children }: { children?: React.ReactNode }) => {
-    const { isAuthenticated, t } = useAppConfig();
+    const { isAuthenticated, authLoading } = useAppConfig();
     const location = useLocation();
 
+    if (authLoading) {
+        return <PageLoader />;
+    }
+
     if (!isAuthenticated) {
-        // Redirect them to the /login page, but save the current location they were
-        // trying to go to when they were redirected. This allows us to send them
-        // along to that page after they login, which is a nicer user experience.
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
@@ -83,29 +80,28 @@ const RequireAuth = ({ children }: { children?: React.ReactNode }) => {
 // Logic Component to Handle Bans
 const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
     const location = useLocation();
-    const navigate = useNavigate();
     const [banState, setBanState] = useState<'none' | 'banned' | 'shortener'>('none');
     const [banEndTime, setBanEndTime] = useState<number | null>(null);
     const [isUnlocking, setIsUnlocking] = useState(false);
     const [isUnlockUrl, setIsUnlockUrl] = useState(false);
     
-    // عداد سري لفك الحظر يدوياً
     const [secretClicks, setSecretClicks] = useState(0);
-
     const { t, lang } = useAppConfig();
 
     // --- REFRESH PROTECTION LOGIC ---
     useEffect(() => {
         try {
             const navEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
+            // Removed sessionStorage.clear() here to prevent accidental bans on simple refreshes
+            // We rely on session sequence check for copy/new tab detection
             if (navEntry && navEntry.type === 'reload' && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/signup') {
-                sessionStorage.clear();
-                window.location.replace('/');
+               // Optional: redirect to home on refresh but no ban
+               // window.location.replace('/');
             }
         } catch (e) {}
     }, []);
 
-    // --- ADMIN UNBAN CHECK (IMMEDIATE) ---
+    // --- ADMIN UNBAN CHECK ---
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const searchParams = new URLSearchParams(window.location.search);
@@ -132,7 +128,7 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
         }
     };
 
-    // --- REAL-TIME BAN MONITORING (With Fingerprint & IndexedDB) ---
+    // --- REAL-TIME BAN MONITORING ---
     useEffect(() => {
         if (isUnlocking || isUnlockUrl || SecureStorage.isAdmin()) return;
 
@@ -147,13 +143,11 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
                     setBanState('none');
                     setBanEndTime(null);
                 }
-             } else {
-                 // Check logic only applies if no ban is currently active
              }
         };
 
         checkBanStatus();
-        const intervalId = setInterval(checkBanStatus, 2000); // Check regularly
+        const intervalId = setInterval(checkBanStatus, 2000); 
 
         const handleStorageChange = (e: StorageEvent) => {
             if (e.key === null || e.key.includes(BAN_KEY) || e.key.includes("sys")) {
@@ -168,7 +162,7 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
         };
     }, [isUnlocking, isUnlockUrl]);
 
-    // --- NAVIGATION & REFERRER CHECKS ---
+    // --- NAVIGATION CHECKS ---
     useEffect(() => {
         if (SecureStorage.isAdmin() || isUnlocking || isUnlockUrl) return;
         if (banState === 'banned') return;
@@ -182,7 +176,7 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
              sendTelegramLog('BANNED', reason, `Path: ${location.pathname}`);
         };
 
-        // 1. Check if running in Iframe
+        // 1. Iframe Check
         if (window.self !== window.top) {
             try {
                 window.top!.location = window.self.location; 
@@ -192,15 +186,11 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
             return;
         }
 
-        // 2. Anti-Shortener
-        const referrer = document.referrer ? document.referrer.toLowerCase() : '';
-        const badReferrers = ['bit.ly', 'goo.gl', 'tinyurl', 'ow.ly', 't.co', 'is.gd', 'buff.ly', 'adf.ly', 'bit.do', 'cut.ly', 'cutt.ly'];
-        if (badReferrers.some(r => referrer.includes(r))) {
-            applyBan("URL Shortener Detected");
-            return;
-        }
+        // 2. Anti-Shortener / Referrer Check - MODIFIED: NO BAN as requested
+        // Code removed or kept as warning only in main App component
 
-        // 3. Sequence Check (Redirect if internal page accessed without context)
+        // 3. Sequence Check / Deep Link Ban
+        // If a user accesses step-2 or later without session flags, it means they copied the link to a new window/tab.
         const publicPaths = ['/login', '/signup', '/home'];
         if (location.pathname !== '/' && !publicPaths.includes(location.pathname)) {
             const sessionActive = sessionStorage.getItem('session_active');
@@ -210,7 +200,8 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
             const isFinalViolation = location.pathname === '/destination' && !sessionStorage.getItem('step3_completed');
 
             if (isStep1Violation || isStep2Violation || isStep3Violation || isFinalViolation) {
-                window.location.replace('/');
+                // Previously just redirect. Now BAN as requested for "Copy Link and Open in New Window"
+                applyBan("Bypass Attempt: Link Copy / Deep Link Detected");
             }
         }
     }, [location, banState, isUnlocking, isUnlockUrl]);
@@ -228,15 +219,6 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
                      </div>
                      <div>
                          <h1 className="text-3xl font-black text-green-500 mb-2 tracking-wider">ACCESS GRANTED</h1>
-                         <p className="text-green-400/60 font-mono text-sm">System Override Initiated...</p>
-                     </div>
-                     <div className="w-64 h-2 bg-zinc-800 rounded-full overflow-hidden mt-4">
-                         <motion.div 
-                             initial={{ width: "0%" }}
-                             animate={{ width: "100%" }}
-                             transition={{ duration: 2 }}
-                             className="h-full bg-green-500"
-                         />
                      </div>
                      <p className="text-white font-bold mt-4">Welcome Back, Admin</p>
                  </motion.div>
@@ -278,7 +260,6 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
     return <>{children}</>;
 };
 
-// Wrapper to handle AnimatePresence location
 const AnimatedRoutes = () => {
   const location = useLocation();
   
@@ -290,10 +271,8 @@ const AnimatedRoutes = () => {
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/signup" element={<SignupPage />} />
                     
-                    {/* Handle Supabase Redirect */}
                     <Route path="/home" element={<Navigate to="/" replace />} />
 
-                    {/* Protected Routes */}
                     <Route path="/" element={
                         <RequireAuth>
                             <HomePage />
@@ -332,18 +311,12 @@ const App: React.FC = () => {
     if (storedLang && translations[storedLang as Lang]) {
         return storedLang as Lang;
     }
-    try {
-        const browserLang = navigator.language.split('-')[0];
-        const supportedLangs = ['ar', 'en', 'es', 'fr', 'de', 'pt', 'ru', 'zh'];
-        if (supportedLangs.includes(browserLang)) {
-            return browserLang as Lang;
-        }
-    } catch (e) {}
     return 'ar';
   };
 
   const [lang, setLangState] = useState<Lang>(getInitialLang());
   const [showSecurityWarning, setShowSecurityWarning] = useState(false);
+  const [securityMsg, setSecurityMsg] = useState('');
   const [isIncognito, setIsIncognito] = useState(false);
   const [isAdBlockActive, setIsAdBlockActive] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -366,7 +339,7 @@ const App: React.FC = () => {
       setIsAdmin(SecureStorage.isAdmin());
   }, []);
 
-  // AdBlock Detection Logic
+  // AdBlock Detection Logic - MODIFIED: Warning ONLY (No Ban)
   useEffect(() => {
     if (SecureStorage.isAdmin()) return;
 
@@ -407,9 +380,7 @@ const App: React.FC = () => {
 
        if (detected) {
            setIsAdBlockActive(true);
-           const endTime = Date.now() + 3600000;
-           SecureStorage.setBan(endTime); 
-           sendTelegramLog('BANNED', 'AdBlock Detected');
+           // NO BAN APPLIED
        }
     };
 
@@ -418,79 +389,52 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Strict Incognito Detection
+  // Incognito Detection - MODIFIED: Apply Actual Ban
   useEffect(() => {
     if (SecureStorage.isAdmin()) return;
-
     const detectIncognito = async () => {
         const isPrivate = await SecureStorage.isIncognitoMode();
         if (isPrivate) {
-            setIsIncognito(true);
-            const endTime = Date.now() + (24 * 60 * 60 * 1000); 
-            SecureStorage.setBan(endTime);
-            sendTelegramLog('BANNED', 'Incognito Mode Detected');
+             setIsIncognito(true);
+             // Apply actual ban for using Incognito
+             const banDuration = 24 * 60 * 60 * 1000;
+             SecureStorage.setBan(Date.now() + banDuration);
+             sendTelegramLog('BANNED', 'Incognito Mode Detected', 'User entered from Private Tab');
         }
     };
     detectIncognito();
   }, []);
 
-  // Security Measures
+  // Security Measures - Warnings only for Context/Referrer
   useEffect(() => {
     if (SecureStorage.isAdmin()) return;
 
-    const triggerSecurityAlert = () => {
+    const triggerSecurityAlert = (msg: string) => {
+        setSecurityMsg(msg);
         setShowSecurityWarning(true);
         setTimeout(() => setShowSecurityWarning(false), 3500);
-    };
-
-    const preventCopy = (e: ClipboardEvent) => { 
-        const target = e.target as HTMLElement;
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-        e.preventDefault(); 
     };
 
     const preventContext = (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
         e.preventDefault();
-        triggerSecurityAlert();
+        triggerSecurityAlert(translations[lang].security?.alert || "Security Alert");
     };
     
     document.addEventListener('contextmenu', preventContext);
-    document.addEventListener('copy', preventCopy);
-    document.addEventListener('cut', preventCopy);
     
-    document.addEventListener('selectstart', (e) => {
-         const target = e.target as HTMLElement;
-         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') e.preventDefault();
-    });
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if (
-            e.key === 'F12' ||
-            (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) ||
-            (e.ctrlKey && e.key === 'u') ||
-            (e.ctrlKey && e.key === 'U') ||
-            (e.metaKey && e.altKey && (e.key === 'i' || e.key === 'j' || e.key === 'c')) || 
-            (e.metaKey && e.key === 'u') ||
-            (e.ctrlKey && (e.key === 's' || e.key === 'S'))
-        ) {
-            e.preventDefault();
-            e.stopPropagation();
-            triggerSecurityAlert();
-            return false;
-        }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
+    // Referrer Check - Warning Only
+    const referrer = document.referrer ? document.referrer.toLowerCase() : '';
+    const badReferrers = ['bit.ly', 'goo.gl', 'tinyurl', 'ow.ly', 't.co', 'is.gd', 'buff.ly', 'adf.ly', 'bit.do', 'cut.ly', 'cutt.ly'];
+    if (badReferrers.some(r => referrer.includes(r))) {
+         triggerSecurityAlert("External Link Detected");
+    }
 
     return () => {
         document.removeEventListener('contextmenu', preventContext);
-        document.removeEventListener('keydown', handleKeyDown);
-        document.removeEventListener('copy', preventCopy);
-        document.removeEventListener('cut', preventCopy);
     };
-  }, []);
+  }, [lang]);
 
   const t = translations[lang] || translations.en;
 
@@ -508,10 +452,17 @@ const App: React.FC = () => {
     );
   }
 
+  // Modified AdBlock Screen: Non-banning, just overlay
   if (isAdBlockActive) {
       return (
-        <div className={`fixed inset-0 z-[99999] min-h-screen flex flex-col items-center justify-center bg-black text-white p-6 text-center ${lang === 'ar' ? 'rtl' : 'ltr'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-            <div className="bg-zinc-900 border border-yellow-500 rounded-3xl p-10 max-w-lg shadow-[0_0_50px_rgba(234,179,8,0.3)]">
+        <div className={`fixed inset-0 z-[99999] min-h-screen flex flex-col items-center justify-center bg-black/95 backdrop-blur-md text-white p-6 text-center ${lang === 'ar' ? 'rtl' : 'ltr'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+            <div className="bg-zinc-900 border border-yellow-500 rounded-3xl p-10 max-w-lg shadow-[0_0_50px_rgba(234,179,8,0.3)] relative">
+                <button 
+                    onClick={() => setIsAdBlockActive(false)} 
+                    className="absolute top-4 right-4 text-gray-400 hover:text-white"
+                >
+                    ✕
+                </button>
                 <MonitorX className="w-20 h-20 text-yellow-500 mx-auto mb-6" />
                 <h1 className="text-3xl font-black text-yellow-500 mb-4">{t.adblock?.title || "Ad Blocker Detected"}</h1>
                 <p className="text-gray-300 text-lg font-bold leading-relaxed mb-6">
@@ -520,6 +471,9 @@ const App: React.FC = () => {
                 <button onClick={() => window.location.reload()} className="bg-yellow-500 text-black font-black py-3 px-8 rounded-xl hover:bg-yellow-400 transition-colors w-full">
                     {t.final?.msg?.react === 'Reaction' ? 'Reload' : 'تحديث الصفحة'}
                 </button>
+                <p className="mt-4 text-xs text-gray-500 cursor-pointer hover:text-gray-400" onClick={() => setIsAdBlockActive(false)}>
+                    (Click here if this is a mistake)
+                </p>
             </div>
         </div>
       );
@@ -549,7 +503,7 @@ const App: React.FC = () => {
                             className="bg-zinc-900/95 text-white px-6 py-3 rounded-full shadow-lg border border-zinc-700/50 backdrop-blur-md max-w-xs text-center"
                         >
                             <span className="font-bold text-sm tracking-wide text-gray-200">
-                                {t.security?.desc || "Security Restriction"}
+                                {securityMsg || t.security?.desc || "Security Restriction"}
                             </span>
                         </motion.div>
                     </div>

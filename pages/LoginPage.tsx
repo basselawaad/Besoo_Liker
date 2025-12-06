@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AlertCircle, Loader2, KeyRound, ArrowLeft, CheckCircle } from 'lucide-react';
 import { useAppConfig } from '../store';
 import { supabase } from '../supabaseClient'; 
 
@@ -46,6 +46,10 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // States for Password Reset
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -66,14 +70,81 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!email) { setError(t.auth.errorEmpty); return; }
+
+    setLoading(true);
+    try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin + '/update-password',
+        });
+        if (error) throw error;
+        setResetSent(true);
+    } catch (err: any) {
+        setError(err.message || 'Error sending reset link');
+    } finally {
+        setLoading(false);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
       setLoading(true);
       await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: 'https://besooliker.vercel.app/home' }
+        options: { redirectTo: window.location.origin + '/home' }
       });
   };
 
+  // If in Password Reset Mode
+  if (isResetMode) {
+      return (
+        <div className="flex items-center justify-center min-h-[80vh] w-full px-4">
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="w-full max-w-[450px] bg-[#1e1e1e] rounded-[28px] p-8 md:p-10 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-[#303030] text-center"
+            >
+                <div className="flex flex-col items-center mb-6">
+                    <div className="w-16 h-16 bg-blue-600/10 rounded-full flex items-center justify-center mb-4 border border-blue-600/20">
+                        {resetSent ? <CheckCircle className="w-8 h-8 text-green-500" /> : <KeyRound className="w-8 h-8 text-blue-500" />}
+                    </div>
+                    <h1 className="text-2xl font-bold text-white mb-2">{t.auth.resetPassTitle}</h1>
+                    <p className="text-gray-400 text-sm">
+                        {resetSent ? t.auth.resetSuccess : t.auth.verifyText}
+                    </p>
+                </div>
+
+                {!resetSent ? (
+                    <form onSubmit={handleResetPassword} className="w-full text-left">
+                        <FloatingInput id="reset-email" type="email" value={email} onChange={e => setEmail(e.target.value)} label={t.auth.email} dir={lang === 'ar' ? 'rtl' : 'ltr'} />
+                        {error && <div className="text-red-500 text-sm mb-4 flex items-center gap-2"><AlertCircle className="w-4 h-4"/>{error}</div>}
+                        
+                        <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2">
+                            {loading && <Loader2 className="w-4 h-4 animate-spin"/>}
+                            {t.auth.sendResetLink}
+                        </button>
+                    </form>
+                ) : (
+                    <div className="bg-green-500/10 p-4 rounded-xl border border-green-500/20 mb-6">
+                        <p className="text-green-400 text-sm">{email}</p>
+                    </div>
+                )}
+
+                <button 
+                    onClick={() => { setIsResetMode(false); setResetSent(false); setError(''); }}
+                    className="mt-6 flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-colors text-sm w-full"
+                >
+                    <ArrowLeft className={`w-4 h-4 ${lang === 'ar' ? '' : 'rotate-180'}`} />
+                    {t.auth.backToLogin}
+                </button>
+            </motion.div>
+        </div>
+      );
+  }
+
+  // Standard Login View
   return (
     <div className="flex items-center justify-center min-h-[80vh] w-full px-4">
         <motion.div 
@@ -91,16 +162,26 @@ const LoginPage: React.FC = () => {
                      </svg>
                 </div>
                 <h1 className="text-2xl font-normal text-white mb-2">{t.auth.loginTitle}</h1>
-                <p className="text-base text-gray-400">{t.home.subtitle}</p>
             </div>
 
             <form onSubmit={handleSubmit} className="w-full text-left">
                 <FloatingInput id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} label={t.auth.email} dir={lang === 'ar' ? 'rtl' : 'ltr'} />
                 <FloatingInput id="pass" type="password" value={password} onChange={e => setPassword(e.target.value)} label={t.auth.password} dir={lang === 'ar' ? 'rtl' : 'ltr'} />
+                
+                {/* Forgot Password Link */}
+                <div className="flex justify-end mb-4">
+                    <button 
+                        type="button" 
+                        onClick={() => setIsResetMode(true)}
+                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                        {t.auth.forgotPass}
+                    </button>
+                </div>
 
                 {error && <div className="text-red-500 text-sm mb-4 flex items-center gap-2"><AlertCircle className="w-4 h-4"/>{error}</div>}
 
-                <div className="flex justify-between items-center mt-8">
+                <div className="flex justify-between items-center mt-6">
                      <Link to="/signup" className="text-blue-400 font-bold hover:bg-blue-500/10 px-4 py-2 rounded transition-colors text-sm">
                         {t.auth.signupTitle}
                     </Link>
