@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Link2, GlobeLock } from 'lucide-react';
 import { useAppConfig } from '../store';
 
 const FAQPage: React.FC = () => {
@@ -10,7 +10,7 @@ const FAQPage: React.FC = () => {
   const [canProceed, setCanProceed] = useState(false);
   const { t } = useAppConfig();
 
-  // Page 2 logic: Check if step 1 is completed
+  // Step 2 Logic: Check if step 1 is completed
   useEffect(() => {
     if (!sessionStorage.getItem('step1_completed')) {
       navigate('/');
@@ -26,107 +26,94 @@ const FAQPage: React.FC = () => {
     }
   }, [timeLeft]);
 
-  const handleNext = () => {
+  const handleNextClick = () => {
     if (canProceed) {
-        // Store key for step 2
-        sessionStorage.setItem('step2_completed', 'true');
-        navigate('/step-3');
+      // Register Step 2 completion
+      sessionStorage.setItem('step2_completed', 'true');
+      navigate('/step-3');
     }
   };
 
+  const progress = ((20 - timeLeft) / 20) * 100;
+
   return (
     <motion.div 
-      initial={{ opacity: 0, x: 50 }}
+      initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -50 }}
+      exit={{ opacity: 0, x: -20 }}
       className="w-full max-w-md"
     >
-      <div className="bg-zinc-950/80 backdrop-blur-md rounded-3xl p-6 shadow-[0_0_30px_rgba(234,179,8,0.15)] border border-yellow-600/30 text-center relative overflow-hidden flex flex-col h-full min-h-[500px]">
+      <div className="bg-zinc-950/80 backdrop-blur-md rounded-3xl p-6 shadow-[0_0_30px_rgba(234,179,8,0.15)] border border-yellow-600/30 text-center relative overflow-hidden flex flex-col h-full min-h-[480px]">
         
-        {/* Header Dark/Yellow with Icon */}
-        <div className="mb-6 border-b border-yellow-600/30 pb-4 flex-shrink-0 flex flex-col items-center">
-            <img 
-              src="https://cdn-icons-png.flaticon.com/512/1533/1533913.png?v=2" 
-              className="w-12 h-12 mb-2 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" 
-              alt="Besoo Liker Logo" 
-            />
-            <h1 className="text-3xl font-black text-yellow-400 tracking-tighter">{t.home.title}</h1>
-            <p className="text-gray-400 font-bold text-sm mt-1">{t.faq.pageNum}</p>
-        </div>
-
-        {/* Part 2: How it works - Expanded */}
-        <div className="flex-grow w-full overflow-y-auto mb-6 p-5 bg-zinc-900/50 rounded-xl border border-zinc-800 text-right space-y-5 custom-scrollbar shadow-inner" dir="rtl">
-            <div className="space-y-4">
-                <h3 className="text-lg font-black text-yellow-400 border-b border-yellow-600/20 pb-2">{t.faq.title}</h3>
-                <ul className="space-y-4 text-sm text-gray-300 font-medium">
-                    <li className="flex items-start gap-3 bg-zinc-900/80 p-3 rounded-xl border border-white/5 hover:border-yellow-500/30 transition-colors">
-                        <span className="bg-yellow-500/20 text-yellow-400 w-8 h-8 flex items-center justify-center rounded-full text-base font-black flex-shrink-0">1</span>
-                        <div>
-                            <span className="text-white font-bold block mb-1 text-base">{t.faq.step1Title}</span>
-                            <span className="text-xs text-gray-400 leading-relaxed">{t.faq.step1Desc}</span>
-                        </div>
-                    </li>
-                    <li className="flex items-start gap-3 bg-zinc-900/80 p-3 rounded-xl border border-white/5 hover:border-yellow-500/30 transition-colors">
-                        <span className="bg-yellow-500/20 text-yellow-400 w-8 h-8 flex items-center justify-center rounded-full text-base font-black flex-shrink-0">2</span>
-                        <div>
-                            <span className="text-white font-bold block mb-1 text-base">{t.faq.step2Title}</span>
-                            <span className="text-xs text-gray-400 leading-relaxed">{t.faq.step2Desc}</span>
-                        </div>
-                    </li>
-                    <li className="flex items-start gap-3 bg-zinc-900/80 p-3 rounded-xl border border-white/5 hover:border-yellow-500/30 transition-colors">
-                        <span className="bg-yellow-500/20 text-yellow-400 w-8 h-8 flex items-center justify-center rounded-full text-base font-black flex-shrink-0">3</span>
-                        <div>
-                            <span className="text-white font-bold block mb-1 text-base">{t.faq.step3Title}</span>
-                            <span className="text-xs text-gray-400 leading-relaxed">{t.faq.step3Desc}</span>
-                        </div>
-                    </li>
-                    <li className="flex items-start gap-3 bg-zinc-900/80 p-3 rounded-xl border border-white/5 hover:border-yellow-500/30 transition-colors">
-                        <span className="bg-yellow-500/20 text-yellow-400 w-8 h-8 flex items-center justify-center rounded-full text-base font-black flex-shrink-0">4</span>
-                        <div>
-                            <span className="text-white font-bold block mb-1 text-base">{t.faq.step4Title}</span>
-                            <span className="text-xs text-gray-400 leading-relaxed">{t.faq.step4Desc}</span>
-                        </div>
-                    </li>
-                </ul>
+        {/* Header - Main Name */}
+        <div className="mb-6 border-b border-yellow-600/30 pb-4 flex flex-col items-center">
+            <h1 className="text-3xl font-black text-yellow-400 tracking-tighter mb-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                {t.home.title}
+            </h1>
+            <div className="flex items-center gap-2 text-gray-400 text-sm font-bold bg-zinc-900/50 px-4 py-1.5 rounded-full border border-white/5 shadow-inner">
+                <Link2 className="w-3 h-3" />
+                <span>{t.faq.pageNum}</span>
             </div>
         </div>
 
-        {/* Timer Bar */}
-        <div className="mb-8 flex-shrink-0">
-            {!canProceed && (
-                <div className="flex justify-between items-end mb-2">
-                    <span className="text-gray-400 font-bold text-sm">{t.faq.checking}</span>
-                    <span className="text-yellow-400 font-black text-xl">{timeLeft} {t.faq.seconds}</span>
-                </div>
-            )}
-            <div className="w-full bg-zinc-800 rounded-full h-3 overflow-hidden border border-zinc-700">
-                <motion.div 
-                    initial={{ width: "100%" }}
-                    animate={{ width: "0%" }}
-                    transition={{ duration: 20, ease: "linear" }}
-                    className="bg-yellow-400 h-full rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)]"
-                />
+        {/* Content - Shortener Style Step 2 */}
+        <div className="flex-grow flex flex-col items-center justify-center space-y-8 mb-6">
+            
+            {/* Timer Circle */}
+            <div className="relative w-36 h-36 flex items-center justify-center">
+                 <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                    <circle cx="72" cy="72" r="66" stroke="#27272a" strokeWidth="8" fill="transparent" />
+                    <circle 
+                        cx="72" cy="72" r="66" strokeWidth="8" fill="transparent"
+                        strokeDasharray={2 * Math.PI * 66}
+                        strokeDashoffset={2 * Math.PI * 66 - (progress / 100) * 2 * Math.PI * 66}
+                        strokeLinecap="round"
+                        className="text-blue-500 transition-all duration-1000 ease-linear stroke-current drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                    />
+                 </svg>
+                 
+                 <div className="flex flex-col items-center z-10">
+                    <span className="text-5xl font-black text-white">{timeLeft}</span>
+                    <span className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Seconds</span>
+                 </div>
             </div>
+
+            <div className="space-y-3 w-full">
+                 <h2 className="text-xl font-bold text-white flex items-center justify-center gap-2">
+                    <GlobeLock className={`w-5 h-5 text-blue-500 ${!canProceed ? 'animate-pulse' : ''}`} />
+                    <span>{t.faq.checking}</span>
+                 </h2>
+                 <p className="text-gray-400 text-sm font-medium">
+                    Verifying secure connection to the destination server...
+                 </p>
+                 
+                 {/* Fake Progress Bar */}
+                 <div className="mx-auto w-full max-w-[280px] bg-zinc-900 rounded-full h-2 overflow-hidden border border-white/5">
+                    <motion.div 
+                        initial={{ width: "0%" }}
+                        animate={{ width: canProceed ? "100%" : "85%" }}
+                        transition={{ duration: 20, ease: "linear" }}
+                        className="h-full bg-blue-500"
+                    />
+                 </div>
+            </div>
+
         </div>
 
+        {/* Button */}
         <button 
-            onClick={handleNext}
+            onClick={handleNextClick}
             disabled={!canProceed}
-            className={`w-full py-4 rounded-xl font-black text-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-xl flex-shrink-0 ${
-                canProceed ? 'bg-yellow-400 text-black hover:bg-yellow-300 hover:scale-[1.02] shadow-[0_0_20px_rgba(234,179,8,0.4)]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
+            className={`w-full py-4 rounded-xl font-black text-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-xl ${
+                canProceed ? 'bg-blue-500 text-white hover:bg-blue-400 hover:scale-[1.02] shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
             }`}
         >
-            {canProceed ? (
+            {canProceed ? t.faq.buttonProceed : t.faq.buttonWait}
+            {canProceed && (
                 <>
-                    <span>{t.faq.buttonProceed}</span>
-                    <ArrowLeft className="w-5 h-5 rtl:block ltr:hidden stroke-[3px]" />
-                    <ArrowLeft className="w-5 h-5 rtl:hidden ltr:block transform rotate-180 stroke-[3px]" />
+                    <ArrowLeft className="w-6 h-6 rtl:block ltr:hidden stroke-[3px]" />
+                    <ArrowLeft className="w-6 h-6 rtl:hidden ltr:block transform rotate-180 stroke-[3px]" />
                 </>
-            ) : (
-                <div className="flex items-center gap-2">
-                    <Loader2 className="w-5 h-5 animate-spin text-yellow-500" />
-                    <span>{t.faq.buttonWait}</span>
-                </div>
             )}
         </button>
 

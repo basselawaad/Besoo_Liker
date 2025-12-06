@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, Lock } from 'lucide-react';
+import { ShieldCheck, Lock, Clock } from 'lucide-react';
 import { useAppConfig, SecureStorage, sendTelegramLog } from '../store';
 import { useNavigate } from 'react-router-dom';
 
@@ -19,38 +19,37 @@ const FinalPage: React.FC = () => {
   // Service Page logic: Strict check for sequence
   useEffect(() => {
     // التحقق من وجود جميع المفاتيح لضمان المرور بالتسلسل الصحيح
-    // هذا يمنع المستخدم من نسخ الرابط وفتحه في مكان آخر مباشرة
     const step1 = sessionStorage.getItem('step1_completed');
     const step2 = sessionStorage.getItem('step2_completed');
     const step3 = sessionStorage.getItem('step3_completed');
 
-    if (!step1 || !step2 || !step3) {
+    if ((!step1 || !step2 || !step3) && !isAdmin) {
       navigate('/');
     }
-  }, [navigate]);
+  }, [navigate, isAdmin]);
 
+  // تعديل هام: التحقق من "مؤقت الانتظار" بدلاً من "الحظر"
   useEffect(() => {
-    const checkBan = async () => {
-        const savedEndTime = await SecureStorage.getBan(); 
+    const checkCooldown = () => {
+        // نستخدم getItem (الخاص بالمؤقت) بدلاً من getBan (الخاص بالحظر)
+        const savedEndTime = SecureStorage.getItem(); 
         if (savedEndTime) {
-            const remaining = Math.round((savedEndTime - Date.now()) / 1000);
-            if (remaining > 0) setTimeLeft(remaining);
-            else SecureStorage.removeBan();
+            const endTime = parseInt(savedEndTime);
+            if (!isNaN(endTime)) {
+                const remaining = Math.floor((endTime - Date.now()) / 1000);
+                if (remaining > 0) {
+                    setTimeLeft(remaining);
+                } else {
+                    setTimeLeft(null);
+                    SecureStorage.removeItem();
+                }
+            }
         }
     };
-    checkBan();
-  }, []);
-
-  useEffect(() => {
-    if (timeLeft === null) return;
-    if (timeLeft <= 0) {
-      setTimeLeft(null);
-      SecureStorage.removeBan();
-      return;
-    }
-    const intervalId = setInterval(() => setTimeLeft((prev) => (prev !== null ? prev - 1 : null)), 1000);
+    checkCooldown();
+    const intervalId = setInterval(checkCooldown, 1000);
     return () => clearInterval(intervalId);
-  }, [timeLeft]);
+  }, []);
 
   const toggleEmoji = (emojiId: string) => {
     if (timeLeft !== null) return;
@@ -74,36 +73,27 @@ const FinalPage: React.FC = () => {
     return input.replace(/<[^>]*>?/gm, "").trim();
   };
 
-  const getDeviceId = async () => {
-      return await SecureStorage.generateFingerprint();
-  };
-
   const handleSend = async () => {
     setLoading(true);
 
     // --- SECURITY FIREWALL ---
-    // إذا كان هناك أي انتهاك، توقف فوراً ولا ترسل شيئاً للبوت
-    
     // 1. Honeypot Check (Bots)
     if (honeypot && !isAdmin) {
         setLoading(false);
         showToast(t.final.toast.bot || "Bot Detected", "error");
         sendTelegramLog('BANNED', 'Honeypot Triggered');
-        return; // STOP
+        return; 
     }
 
-    // 2. Strict Link/Sequence Check (Copy Paste Prevention)
+    // 2. Strict Link/Sequence Check
     const step1 = sessionStorage.getItem('step1_completed');
     const step2 = sessionStorage.getItem('step2_completed');
     const step3 = sessionStorage.getItem('step3_completed');
     if ((!step1 || !step2 || !step3) && !isAdmin) {
         setLoading(false);
         showToast(t.shortener?.title || "Sequence Error", "error");
-        // Optional: Ban malicious user
-        await SecureStorage.setBan(Date.now() + 3600000); 
-        sendTelegramLog('BANNED', 'Sequence/Step Missing', 'Final Page Direct Access');
         setTimeout(() => navigate('/'), 2000);
-        return; // STOP
+        return; 
     }
 
     // 3. Incognito Check
@@ -111,36 +101,24 @@ const FinalPage: React.FC = () => {
     if (isIncognito && !isAdmin) {
         setLoading(false);
         showToast("Incognito Mode Not Allowed", "error");
+        // الحظر هنا مقبول لأنه مخالفة صريحة
         const endTime = Date.now() + 86400000;
         await SecureStorage.setBan(endTime);
         sendTelegramLog('BANNED', 'Incognito Mode on Submission');
         window.location.reload();
-        return; // STOP
+        return; 
     }
 
-    // 4. Existing Ban Check (Fingerprint)
-    const existingBan = await SecureStorage.getBan();
-    if (existingBan && existingBan > Date.now() && !isAdmin) {
-         setLoading(false);
-         showToast(t.ban?.title || "Banned", "error");
-         sendTelegramLog('BANNED', 'Attempted Request while Banned');
-         window.location.reload();
-         return; // STOP
-    }
-
-    // 5. AdBlock Check (Network level)
+    // 4. AdBlock Check
     try {
         await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { method: 'HEAD', mode: 'no-cors' });
     } catch (e) {
-        // Likely AdBlock
         if (!isAdmin) {
             setLoading(false);
             showToast(t.adblock?.title || "AdBlock Detected", "error");
-            sendTelegramLog('BANNED', 'AdBlock on Submission');
-            return; // STOP
+            return; 
         }
     }
-
     // --- END SECURITY FIREWALL ---
 
     const fbRegex = /^(https?:\/\/)?(www\.|web\.|m\.|mobile\.)?(facebook\.com|fb\.watch|fb\.com|fb\.me)\/.+/i;
@@ -157,33 +135,26 @@ const FinalPage: React.FC = () => {
         return;
     }
 
-    // 1. الحصول على اسم التطبيق
-    const appName = t.home.title;
-    
-    // 3. حساب عدد مرات الطلب للمستخدم (من LocalStorage)
-    const storedCount = localStorage.getItem('besoo_user_request_count');
-    const currentCount = storedCount ? parseInt(storedCount) + 1 : 1;
+    const currentCount = localStorage.getItem('besoo_user_request_count');
+    const nextCount = currentCount ? parseInt(currentCount) + 1 : 1;
 
-    // 4. بناء الرسالة باستخدام المركزية
-    const details = `👤 *رقم الطلب:* ${currentCount}\n` +
+    const details = `👤 *رقم الطلب:* ${nextCount}\n` +
                     `🔗 *لينك المنشور:*\n\`${cleanLink}\`\n` +
                     `😍 *نوع رياكت:* ${selectedEmojis.join(", ")}`;
 
     try {
-      // إرسال إشعار المستخدم الجيد
       await sendTelegramLog('GOOD_USER', 'Successful Request', details);
-      
-      localStorage.setItem('besoo_user_request_count', currentCount.toString());
+      localStorage.setItem('besoo_user_request_count', nextCount.toString());
       
       showToast(t.final.toast.sent, "success");
       
-      // 20 دقيقة = 1200 ثانية
-      const duration = 1200;
+      // === FIX APPLIED HERE ===
+      // بدلاً من استخدام setBan (الذي يمنع الدخول للموقع)
+      // نستخدم setItem (الذي يضع مؤقت انتظار فقط)
+      const duration = 1200; // 20 دقيقة
       const endTime = Date.now() + duration * 1000;
       
-      // حفظ باستخدام النظام الآمن (سيتم الحظر بالبصمة أيضاً)
-      // لن يتم الحظر إذا كان المستخدم أدمن
-      await SecureStorage.setBan(endTime);
+      SecureStorage.setItem(endTime.toString()); // استخدام مخزن المؤقت وليس الحظر
       
       setTimeLeft(duration);
       setLink('');
@@ -229,7 +200,6 @@ const FinalPage: React.FC = () => {
 
       <div className="w-full max-w-lg flex flex-col items-center px-4 bg-zinc-950/80 p-8 rounded-2xl border border-yellow-600/20 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
         
-        {/* Security Badge */}
         <div className="flex items-center gap-2 mb-6 bg-green-500/10 border border-green-500/30 px-3 py-1 rounded-full">
             <ShieldCheck className="w-4 h-4 text-green-500" />
             <span className="text-green-500 text-xs font-bold tracking-wider uppercase">{t.final.ssl}</span>
@@ -238,7 +208,6 @@ const FinalPage: React.FC = () => {
         <h1 className="text-3xl font-black mb-8 text-yellow-400 tracking-wide">{t.home.title}</h1>
 
         <div className="w-full relative mb-6">
-            {/* Honeypot Field (Invisible to users, visible to bots) */}
             <input 
                 type="text" 
                 name="website_url_hp"
@@ -312,10 +281,20 @@ const FinalPage: React.FC = () => {
         </div>
 
         {timeLeft !== null ? (
-            <div className="text-center w-full bg-black/60 p-6 rounded-2xl border-2 border-gray-800">
-                <div className="text-base text-orange-500 font-black mb-2 uppercase tracking-wider">{t.final.wait}</div>
-                <div className="text-4xl text-white font-black font-mono tracking-widest" dir="ltr">{formatTime(timeLeft)}</div>
-            </div>
+            <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="text-center w-full bg-zinc-900/80 p-6 rounded-2xl border border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.1)]"
+            >
+                <div className="flex items-center justify-center gap-2 text-yellow-500 font-bold mb-3 uppercase tracking-wider text-sm">
+                    <Clock className="w-5 h-5 animate-pulse" />
+                    {t.final.wait}
+                </div>
+                <div className="text-5xl text-white font-black font-mono tracking-widest bg-black/40 py-4 rounded-xl border border-white/5" dir="ltr">
+                    {formatTime(timeLeft)}
+                </div>
+                <p className="text-gray-400 text-xs mt-3 font-medium">يرجى الانتظار حتى انتهاء الوقت لإرسال طلب جديد</p>
+            </motion.div>
         ) : (
             <div className="w-full">
                 <button

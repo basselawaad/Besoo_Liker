@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Clock, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Link2, Loader2, ShieldCheck } from 'lucide-react';
 import { useAppConfig } from '../store';
 
 const InfoPage: React.FC = () => {
@@ -27,6 +27,8 @@ const InfoPage: React.FC = () => {
     }
   };
 
+  const progress = ((20 - timeLeft) / 20) * 100;
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -34,85 +36,69 @@ const InfoPage: React.FC = () => {
       exit={{ opacity: 0, y: -20 }}
       className="w-full max-w-md"
     >
-      <div className="bg-zinc-950/80 backdrop-blur-md rounded-3xl p-6 shadow-[0_0_30px_rgba(234,179,8,0.15)] border border-yellow-600/30 text-center relative overflow-hidden flex flex-col h-full min-h-[500px]">
+      <div className="bg-zinc-950/80 backdrop-blur-md rounded-3xl p-6 shadow-[0_0_30px_rgba(234,179,8,0.15)] border border-yellow-600/30 text-center relative overflow-hidden flex flex-col h-full min-h-[450px]">
         
-        {/* Header Dark/Yellow with Icon */}
-        <div className="mb-6 border-b border-yellow-600/30 pb-4 flex-shrink-0 flex flex-col items-center">
-            <img 
-              src="https://cdn-icons-png.flaticon.com/512/1533/1533913.png?v=2" 
-              className="w-12 h-12 mb-2 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" 
-              alt="Besoo Liker Logo" 
-            />
-            <h1 className="text-3xl font-black text-yellow-400 tracking-tighter">{t.home.title}</h1>
-            <p className="text-gray-400 font-bold text-sm mt-1">{t.info.pageNum}</p>
+        {/* Header - Main Name */}
+        <div className="mb-6 border-b border-yellow-600/30 pb-4 flex flex-col items-center">
+            <h1 className="text-3xl font-black text-yellow-400 tracking-tighter mb-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                {t.home.title}
+            </h1>
+            <div className="flex items-center gap-2 text-gray-400 text-sm font-bold bg-zinc-900/50 px-4 py-1.5 rounded-full border border-white/5 shadow-inner">
+                <Link2 className="w-3 h-3" />
+                <span>{t.info.pageNum}</span>
+            </div>
         </div>
 
-        {/* Part 1: Intro & Features - Expanded */}
-        <div className="flex-grow w-full overflow-y-auto mb-6 p-5 bg-zinc-900/50 rounded-xl border border-zinc-800 space-y-6 custom-scrollbar shadow-inner">
-            <div className="space-y-3">
-                <h2 className="text-xl font-black text-yellow-400 text-center drop-shadow-sm">{t.info.welcomeTitle}</h2>
-                <p className="text-gray-300 text-sm leading-relaxed font-semibold text-center px-2">
-                    {t.info.welcomeDesc}
-                </p>
-            </div>
+        {/* Content - Shortener Style */}
+        <div className="flex-grow flex flex-col items-center justify-center space-y-8 mb-6">
             
-            <div className="space-y-4">
-                <h3 className="text-lg font-black text-yellow-400 border-b border-yellow-600/20 pb-2 text-center">{t.info.featuresTitle}</h3>
-                
-                {/* List items automatically align Start (Right for AR, Left for EN) due to global dir */}
-                <ul className="space-y-3 text-sm text-gray-300 font-medium text-start">
-                    <li className="flex items-start gap-3 bg-zinc-900/80 p-3 rounded-xl border border-white/5 hover:border-yellow-500/20 transition-colors">
-                        <div className="bg-yellow-500/10 p-1 rounded-full shrink-0 mt-0.5">
-                            <span className="text-yellow-500 text-xs">✔</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-white font-bold">{t.info.feat1Title}</span>
-                            <span className="text-xs text-gray-400 mt-0.5">{t.info.feat1Desc}</span>
-                        </div>
-                    </li>
-                    <li className="flex items-start gap-3 bg-zinc-900/80 p-3 rounded-xl border border-white/5 hover:border-yellow-500/20 transition-colors">
-                        <div className="bg-yellow-500/10 p-1 rounded-full shrink-0 mt-0.5">
-                            <span className="text-yellow-500 text-xs">✔</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-white font-bold">{t.info.feat2Title}</span>
-                            <span className="text-xs text-gray-400 mt-0.5">{t.info.feat2Desc}</span>
-                        </div>
-                    </li>
-                    <li className="flex items-start gap-3 bg-zinc-900/80 p-3 rounded-xl border border-white/5 hover:border-yellow-500/20 transition-colors">
-                        <div className="bg-yellow-500/10 p-1 rounded-full shrink-0 mt-0.5">
-                            <span className="text-yellow-500 text-xs">✔</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-white font-bold">{t.info.feat3Title}</span>
-                            <span className="text-xs text-gray-400 mt-0.5">{t.info.feat3Desc}</span>
-                        </div>
-                    </li>
-                </ul>
+            {/* Timer Circle */}
+            <div className="relative w-36 h-36 flex items-center justify-center">
+                 <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                    <circle cx="72" cy="72" r="66" stroke="#27272a" strokeWidth="8" fill="transparent" />
+                    <circle 
+                        cx="72" cy="72" r="66" strokeWidth="8" fill="transparent"
+                        strokeDasharray={2 * Math.PI * 66}
+                        strokeDashoffset={2 * Math.PI * 66 - (progress / 100) * 2 * Math.PI * 66}
+                        strokeLinecap="round"
+                        className="text-yellow-500 transition-all duration-1000 ease-linear stroke-current drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]"
+                    />
+                 </svg>
+                 
+                 <div className="flex flex-col items-center z-10">
+                    <span className="text-5xl font-black text-white">{timeLeft}</span>
+                    <span className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Seconds</span>
+                 </div>
             </div>
-        </div>
 
-        {/* Timer Content */}
-        <div className="flex flex-col items-center justify-center mb-6 flex-shrink-0">
-            <div className="relative">
-                <div className="w-20 h-20 rounded-full border-4 border-yellow-600/20 flex items-center justify-center bg-yellow-400/5">
-                    {canProceed ? (
-                         <CheckCircle className="w-10 h-10 text-yellow-400" />
-                    ) : (
-                        <span className="text-3xl font-black text-yellow-400 font-mono">{timeLeft}</span>
-                    )}
-                </div>
-                <div className="absolute -top-2 -right-2 bg-yellow-500 text-black p-1.5 rounded-full shadow-md shadow-yellow-500/20">
-                    <Clock className="w-4 h-4" />
-                </div>
+            <div className="space-y-3 w-full">
+                 <h2 className="text-xl font-bold text-white flex items-center justify-center gap-2">
+                    <Loader2 className={`w-5 h-5 text-yellow-500 ${!canProceed ? 'animate-spin' : ''}`} />
+                    <span>Preparing Link...</span>
+                 </h2>
+                 <p className="text-gray-400 text-sm font-medium">
+                    Please wait while we generate your secure destination URL.
+                 </p>
+                 
+                 {/* Fake Info Box */}
+                 <div className="mx-auto w-full max-w-[280px] bg-zinc-900/80 rounded-lg p-3 border border-white/5 flex items-center gap-3 shadow-inner">
+                     <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                        <ShieldCheck className="w-5 h-5 text-blue-500" />
+                     </div>
+                     <div className="text-start flex-1">
+                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Status</p>
+                        <p className="text-xs text-white font-bold">Secure Connection</p>
+                     </div>
+                 </div>
             </div>
+
         </div>
 
         {/* Button */}
         <button 
             onClick={handleNextClick}
             disabled={!canProceed}
-            className={`w-full py-4 rounded-xl font-black text-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-xl flex-shrink-0 ${
+            className={`w-full py-4 rounded-xl font-black text-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-xl ${
                 canProceed ? 'bg-yellow-400 text-black hover:bg-yellow-300 hover:scale-[1.02] shadow-[0_0_20px_rgba(234,179,8,0.4)]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
             }`}
         >
