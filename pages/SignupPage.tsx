@@ -3,10 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { UserPlus, Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { useAppConfig } from '../store';
+import { supabase } from '../supabaseClient'; // استدعاء عميل Supabase
 
 const SignupPage: React.FC = () => {
   const navigate = useNavigate();
-  const { t, signup, loginWithGoogle, lang } = useAppConfig();
+  const { t, signup, lang } = useAppConfig(); // Removed loginWithGoogle from props since we use supabase direct
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,12 +44,17 @@ const SignupPage: React.FC = () => {
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
-    const success = await loginWithGoogle();
-    if (success) {
-        navigate('/');
-    } else {
+    const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+            // توجيه المستخدم للموقع الرئيسي (Vercel)
+            redirectTo: 'https://besooliker.vercel.app',
+        }
+    });
+
+    if (error) {
         setLoading(false);
-        setError("Google Authentication Failed");
+        setError(error.message);
     }
   };
 
