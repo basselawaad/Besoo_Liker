@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-// ⚠️ هام: يجب استبدال هذه القيم ببيانات مشروع Supabase الخاص بك
-// يمكنك الحصول عليها من إعدادات المشروع -> API
-const supabaseUrl = 'https://YOUR_PROJECT_ID.supabase.co';
-const supabaseKey = 'YOUR_ANON_KEY';
+// تم تحديث الرابط بناءً على إعداداتك المذكورة (https://omwcmtcxzmmefgvshhjh.supabase.co)
+const supabaseUrl = 'https://omwcmtcxzmmefgvshhjh.supabase.co';
+const supabaseKey = 'YOUR_ANON_KEY'; // ⚠️ تأكد من وضع مفتاح الـ Anon Key الخاص بك هنا
 
 export const supabase = createClient(supabaseUrl, supabaseKey);

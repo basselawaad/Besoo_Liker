@@ -201,7 +201,7 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
         }
 
         // 3. Sequence Check (Redirect if internal page accessed without context)
-        const publicPaths = ['/login', '/signup'];
+        const publicPaths = ['/login', '/signup', '/home'];
         if (location.pathname !== '/' && !publicPaths.includes(location.pathname)) {
             const sessionActive = sessionStorage.getItem('session_active');
             const isStep1Violation = location.pathname === '/step-1' && !sessionActive;
@@ -290,6 +290,9 @@ const AnimatedRoutes = () => {
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/signup" element={<SignupPage />} />
                     
+                    {/* Handle Supabase Redirect */}
+                    <Route path="/home" element={<Navigate to="/" replace />} />
+
                     {/* Protected Routes */}
                     <Route path="/" element={
                         <RequireAuth>
