@@ -256,11 +256,6 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
                         </p>
                         {banEndTime && <BanTimerDisplay targetTime={banEndTime} />}
                     </div>
-
-                    <div className="mt-6 text-xs text-red-400/50">
-                        ID: {navigator.userAgent.slice(0, 10).replace(/\s/g, '')}-{Date.now().toString().slice(-4)}
-                        {secretClicks > 0 && <span className="ml-2 text-red-500 font-bold">({secretClicks})</span>}
-                    </div>
                 </motion.div>
             </div>
         );

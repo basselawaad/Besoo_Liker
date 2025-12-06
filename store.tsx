@@ -364,7 +364,7 @@ export const translations = {
     },
     security: { alert: 'تنبيه أمني', desc: 'عذراً، هذا الإجراء غير مسموح به حفاظاً على الأمان.' },
     incognito: { title: "وضع التصفح الخفي مرفوض", desc: "لأسباب أمنية، يمنع استخدام الموقع في الوضع المتخفي (Incognito). يرجى فتح الموقع في متصفح عادي." },
-    ban: { title: "تم حظر الوصول", desc: "تم اكتشاف نشاط مريب. الحظر مرتبط ببصمة جهازك.", timer: "ينتهي الحظر خلال:" },
+    ban: { title: "تم حظر الوصول", desc: "لقد قمت بمخالفه استخدام الموقع", timer: "ينتهي الحظر خلال:" },
     adblock: { title: "تم كشف حظر الإعلانات", desc: "يرجى تعطيل AdBlock للمتابعة." },
     shortener: { title: "دخول غير مصرح به", desc: "يجب البدء من الصفحة الرئيسية." }
   },
@@ -409,7 +409,7 @@ export const translations = {
     },
     security: { alert: 'Security Alert', desc: 'Action blocked for security reasons.' },
     incognito: { title: "Private Mode Detected", desc: "Please close Incognito mode to continue." },
-    ban: { title: "Access Restricted", desc: "Suspicious activity detected.", timer: "Lifted in:" },
+    ban: { title: "Access Restricted", desc: "You have violated the site usage terms.", timer: "Lifted in:" },
     adblock: { title: "Ad Blocker Detected", desc: "Please disable AdBlock to continue." },
     shortener: { title: "Direct Access Blocked", desc: "Please start from the home page." }
   },
@@ -427,7 +427,7 @@ export const translations = {
     final: { placeholder: 'Enlace del Post', wait: 'Espere', send: 'Enviar', sending: 'Enviando...', toast: { success: 'Éxito', sent: 'Enviado', error: 'Alerta', fill: 'Llenar datos', invalidFb: 'Enlace inválido', oneEmoji: 'Un emoji', fail: 'Error', ok: 'OK', bot: 'Bot detectado' }, msg: { req: 'Solicitud', link: 'Enlace', react: 'Reacción', visitor: 'Visitante' }, ssl: 'SSL Seguro' },
     security: { alert: 'Alerta de Seguridad', desc: 'Acción bloqueada.' },
     incognito: { title: "Modo Privado Detectado", desc: "Cierre el modo incógnito." },
-    ban: { title: "Acceso Restringido", desc: "Actividad sospechosa.", timer: "Se levanta en:" },
+    ban: { title: "Acceso Restringido", desc: "Has violado los términos de uso del sitio.", timer: "Se levanta en:" },
     adblock: { title: "AdBlock Detectado", desc: "Desactive AdBlock." },
     shortener: { title: "Acceso Directo Bloqueado", desc: "Inicie desde el inicio." }
   },
@@ -445,7 +445,7 @@ export const translations = {
     final: { placeholder: 'Lien du Post', wait: 'Attendez', send: 'Envoyer', sending: 'Envoi...', toast: { success: 'Succès', sent: 'Envoyé', error: 'Alerte', fill: 'Remplir', invalidFb: 'Lien invalide', oneEmoji: 'Un emoji', fail: 'Erreur', ok: 'OK', bot: 'Bot détecté' }, msg: { req: 'Demande', link: 'Lien', react: 'Réact', visitor: 'Visiteur' }, ssl: 'SSL Sécurisé' },
     security: { alert: 'Alerte Sécurité', desc: 'Action bloquée.' },
     incognito: { title: "Mode Privé Détecté", desc: "Fermez le mode incognito." },
-    ban: { title: "Accès Restreint", desc: "Activité suspecte.", timer: "Levé dans :" },
+    ban: { title: "Accès Restreint", desc: "Vous avez violé les conditions d'utilisation.", timer: "Levé dans :" },
     adblock: { title: "AdBlock Détecté", desc: "Désactivez AdBlock." },
     shortener: { title: "Accès Direct Bloqué", desc: "Commencez par l'accueil." }
   },
@@ -463,7 +463,7 @@ export const translations = {
     final: { placeholder: 'Beitrags-Link', wait: 'Warten', send: 'Senden', sending: 'Senden...', toast: { success: 'Erfolg', sent: 'Gesendet', error: 'Alarm', fill: 'Ausfüllen', invalidFb: 'Ungültiger Link', oneEmoji: 'Ein Emoji', fail: 'Fehler', ok: 'OK', bot: 'Bot erkannt' }, msg: { req: 'Anfrage', link: 'Link', react: 'Reakt', visitor: 'Besucher' }, ssl: 'SSL Sicher' },
     security: { alert: 'Sicherheitsalarm', desc: 'Aktion blockiert.' },
     incognito: { title: "Privatmodus Erkannt", desc: "Schließe Inkognito." },
-    ban: { title: "Zugriff verweigert", desc: "Verdächtige Aktivität.", timer: "Endet in:" },
+    ban: { title: "Zugriff verweigert", desc: "Sie haben gegen die Nutzungsbedingungen verstoßen.", timer: "Endet in:" },
     adblock: { title: "AdBlock Erkannt", desc: "AdBlock deaktivieren." },
     shortener: { title: "Direktzugriff Blockiert", desc: "Starte von vorne." }
   },
@@ -481,7 +481,7 @@ export const translations = {
     final: { placeholder: 'Ссылка', wait: 'Ждите', send: 'Отправить', sending: 'Отправка...', toast: { success: 'Успех', sent: 'Отправлено', error: 'Тревога', fill: 'Заполните', invalidFb: 'Неверная ссылка', oneEmoji: 'Один эмодзи', fail: 'Ошибка', ok: 'ОК', bot: 'Бот' }, msg: { req: 'Запрос', link: 'Ссылка', react: 'Реакт', visitor: 'Гость' }, ssl: 'SSL Защита' },
     security: { alert: 'Тревога', desc: 'Действие заблокировано.' },
     incognito: { title: "Инкогнито", desc: "Закройте инкогнито." },
-    ban: { title: "Доступ закрыт", desc: "Подозрительная активность.", timer: "Снятие через:" },
+    ban: { title: "Доступ закрыт", desc: "Вы нарушили правила использования.", timer: "Снятие через:" },
     adblock: { title: "AdBlock", desc: "Выключите AdBlock." },
     shortener: { title: "Блокировка", desc: "Начните с главной." }
   },
@@ -499,7 +499,7 @@ export const translations = {
     final: { placeholder: '帖子链接', wait: '等待', send: '发送', sending: '发送中...', toast: { success: '成功', sent: '已发送', error: '警告', fill: '填写数据', invalidFb: '无效链接', oneEmoji: '仅一个表情', fail: '错误', ok: '确定', bot: '检测到机器人' }, msg: { req: '请求', link: '链接', react: '反应', visitor: '访客' }, ssl: 'SSL 安全' },
     security: { alert: '安全警告', desc: '操作被阻止。' },
     incognito: { title: "检测到隐私模式", desc: "请关闭隐私模式。" },
-    ban: { title: "访问受限", desc: "可疑活动。", timer: "解封倒计时：" },
+    ban: { title: "访问受限", desc: "您违反了网站使用条款。", timer: "解封倒计时：" },
     adblock: { title: "检测到广告拦截", desc: "请关闭广告拦截。" },
     shortener: { title: "直接访问被阻", desc: "请从首页开始。" }
   },
@@ -517,7 +517,7 @@ export const translations = {
     final: { placeholder: 'Link do Post', wait: 'Aguarde', send: 'Enviar', sending: 'Enviando...', toast: { success: 'Sucesso', sent: 'Enviado', error: 'Alerta', fill: 'Preencher', invalidFb: 'Link inválido', oneEmoji: 'Um emoji', fail: 'Erro', ok: 'OK', bot: 'Bot detectado' }, msg: { req: 'Pedido', link: 'Link', react: 'Reação', visitor: 'Visitante' }, ssl: 'SSL Seguro' },
     security: { alert: 'Alerta', desc: 'Ação bloqueada.' },
     incognito: { title: "Modo Privado", desc: "Feche o modo privado." },
-    ban: { title: "Acesso Restrito", desc: "Atividade suspeita.", timer: "Liberado em:" },
+    ban: { title: "Acesso Restrito", desc: "Você violou os termos de uso do site.", timer: "Liberado em:" },
     adblock: { title: "AdBlock Detectado", desc: "Desative o AdBlock." },
     shortener: { title: "Acesso Direto Bloq.", desc: "Comece do início." }
   },
