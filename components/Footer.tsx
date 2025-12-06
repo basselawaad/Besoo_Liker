@@ -8,23 +8,24 @@ const Footer: React.FC = () => {
   const [clickCount, setClickCount] = useState(0);
   const { t } = useAppConfig();
 
-  // المنطق السري: الضغط 20 مرة لتفعيل الأدمن
+  // المنطق السري: الضغط 10 مرات لتفعيل الأدمن
   const handleSecretAdminClick = () => {
     const newCount = clickCount + 1;
     setClickCount(newCount);
 
-    if (newCount >= 20) {
-        // تشفير توكن الأدمن يدوياً هنا لتجنب مشاكل الاستيراد الدائري
-        const SALT = "besoo_secure_hash_x99_v3_ultra";
+    if (newCount >= 10) {
+        // تشفير توكن الأدمن يدوياً
+        const SALT = "besoo_secure_hash_x99_v4_ultra_strict";
         const token = btoa(`GRANTED|${SALT}|${navigator.userAgent.slice(0, 10)}`);
         
         // حفظ التوكن
         localStorage.setItem("__sys_root_privilege_token", token);
         
-        // إزالة الحظر إن وجد
-        localStorage.removeItem("__sys_access_violation_token");
+        // إزالة الحظر إن وجد لضمان دخول الأدمن فوراً
+        localStorage.removeItem("__sys_access_violation_FINAL_v7");
+        localStorage.removeItem("__sys_device_fp_v1");
         
-        // إعادة التوجيه للرئيسية كأدمن
+        // إعادة تحميل الصفحة لتفعيل وضع الأدمن
         window.location.href = "/";
     }
   };
@@ -46,8 +47,8 @@ const Footer: React.FC = () => {
           {t.footer.rights} © 
           <span 
             onClick={handleSecretAdminClick}
-            className="" 
-            title="Copyright"
+            className="cursor-pointer select-none hover:text-yellow-500 transition-colors" 
+            title="Admin Access"
           >
             2026
           </span> 

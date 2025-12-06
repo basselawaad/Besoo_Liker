@@ -1,12 +1,12 @@
 import React, { createContext, useContext } from 'react';
 
 // --- Security Utilities ---
-// تحديث المفاتيح لنسخة (V6 Strict) - حماية مشددة
-export const TIMER_KEY = "__sys_integrity_token_FINAL_v6"; 
-export const BAN_KEY = "__sys_access_violation_FINAL_v6"; 
+// تحديث المفاتيح لنسخة (V7 Ultra Strict)
+export const TIMER_KEY = "__sys_integrity_token_FINAL_v7"; 
+export const BAN_KEY = "__sys_access_violation_FINAL_v7"; 
 export const ADMIN_KEY = "__sys_root_privilege_token"; 
 export const FINGERPRINT_KEY = "__sys_device_fp_v1";
-const SALT = "besoo_secure_hash_x99_v3_ultra_strict"; 
+const SALT = "besoo_secure_hash_x99_v4_ultra_strict"; 
 
 export class SecureStorage {
   // --- Fingerprinting Logic ---
@@ -38,9 +38,10 @@ export class SecureStorage {
         const deviceMemory = (navigator as any).deviceMemory || "unknown";
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const language = navigator.language;
+        const userAgent = navigator.userAgent;
 
         // 3. Combine & Hash
-        const rawString = `${canvasData}|${screenInfo}|${hardwareConcurrency}|${deviceMemory}|${timezone}|${language}`;
+        const rawString = `${canvasData}|${screenInfo}|${hardwareConcurrency}|${deviceMemory}|${timezone}|${language}|${userAgent}`;
         
         // Simple Hash Function (DJB2)
         let hash = 5381;
@@ -54,10 +55,34 @@ export class SecureStorage {
     }
   }
 
+  // --- Strict Incognito Detection ---
+  static async isIncognitoMode(): Promise<boolean> {
+      if (typeof window === 'undefined') return false;
+      if (SecureStorage.isAdmin()) return false;
+
+      // Check 1: Storage Quota (Standard for Chrome/Firefox)
+      try {
+          if ('storage' in navigator && 'estimate' in navigator.storage) {
+              const { quota } = await navigator.storage.estimate();
+              // Incognito usually has a much lower quota limit (e.g. < 120MB)
+              if (quota && quota < 120000000) return true;
+          }
+      } catch (e) {}
+
+      // Check 2: Try/Catch LocalStorage (Safari/Old Browsers)
+      try {
+          localStorage.setItem('__test_incognito__', '1');
+          localStorage.removeItem('__test_incognito__');
+      } catch (e) {
+          return true; // If we can't write to LS, treat as Incognito/Block
+      }
+
+      return false;
+  }
+
   static encrypt(value: string) {
     try {
       if (typeof window === 'undefined') return "";
-      // Add random component to prevent identical strings looking the same, handled in decrypt
       return btoa(`${value}|${SALT}|${navigator.userAgent.slice(0, 10)}`);
     } catch (e) { return ""; }
   }
@@ -108,7 +133,7 @@ export class SecureStorage {
   static removeBan() {
       if (typeof window === 'undefined') return;
       localStorage.removeItem(BAN_KEY);
-      localStorage.removeItem(FINGERPRINT_KEY); // Remove FP ban
+      localStorage.removeItem(FINGERPRINT_KEY); 
       document.cookie = `${BAN_KEY}=; path=/; max-age=0`;
       window.dispatchEvent(new Event("storage"));
   }
@@ -135,8 +160,9 @@ export class SecureStorage {
       // 2. Cookie
       document.cookie = `${BAN_KEY}=${encrypted}; path=/; max-age=86400; SameSite=Strict`;
       
-      // 3. Fingerprint Ban (Strict)
+      // 3. Fingerprint Ban (Most Important)
       const fp = await SecureStorage.generateFingerprint();
+      // Store in a way that attempts to persist
       localStorage.setItem(`${FINGERPRINT_KEY}_${fp}`, encrypted);
   }
 
@@ -144,7 +170,7 @@ export class SecureStorage {
       if (typeof window === 'undefined') return null;
       if (SecureStorage.isAdmin()) return null;
 
-      // Check 1: Fingerprint (Hardest to bypass)
+      // Check 1: Fingerprint (Primary)
       const fp = await SecureStorage.generateFingerprint();
       const fpBan = localStorage.getItem(`${FINGERPRINT_KEY}_${fp}`);
       if (fpBan) {
@@ -206,10 +232,10 @@ const defaultEn = {
       ssl: 'SSL Secure'
     },
     security: { alert: 'Security Alert', desc: 'Action blocked for security reasons.' },
-    incognito: { title: "Private Mode", desc: "Close Incognito." },
+    incognito: { title: "Private Mode Detected", desc: "This site does not work in Incognito/Private mode for security reasons. Please open in a regular tab." },
     ban: { title: "Access Restricted", desc: "Suspicious activity detected.", timer: "Lifted in:" },
     adblock: { title: "Security Check Failed", desc: "Please disable AdBlock or Brave Shields to continue." },
-    shortener: { title: "Traffic Source Blocked", desc: "Access via URL shorteners (Bitly, Cutly, etc.) is prohibited to prevent abuse. Please open the site directly." }
+    shortener: { title: "Direct Access Blocked", desc: "Please start from the home page. Direct links or shorteners are not allowed." }
 };
 
 export const translations = {
@@ -265,12 +291,12 @@ export const translations = {
         desc: 'عذراً، هذا الإجراء غير مسموح به حفاظاً على الأمان.'
     },
     incognito: {
-        title: "تم كشف الوضع المتخفي",
-        desc: "يرجى إغلاق الوضع المتخفي (Incognito) واستخدام المتصفح العادي لضمان حفظ وقت العداد بشكل صحيح."
+        title: "وضع التصفح الخفي مرفوض",
+        desc: "لأسباب أمنية ولحماية النظام، يمنع استخدام الموقع في الوضع المتخفي (Incognito). يرجى فتح الموقع في متصفح عادي."
     },
     ban: {
         title: "تم حظر الوصول",
-        desc: "تم اكتشاف نشاط مريب. لقد حاولت استخدام الموقع مرتين أو تخطي الخطوات.",
+        desc: "تم اكتشاف نشاط مريب أو محاولة استخدام الموقع مرتين. الحماية مفعلة.",
         timer: "ينتهي الحظر خلال:"
     },
     adblock: {
@@ -278,75 +304,17 @@ export const translations = {
         desc: "يرجى تعطيل AdBlock أو Brave Shield للمتابعة. المتصفحات التي تحجب السكربتات غير مدعومة."
     },
     shortener: {
-        title: "رابط خارجي محظور",
-        desc: "يمنع الدخول عبر روابط مختصرة (مثل Bitly وغيرها) لتجنب التحايل. يرجى استخدام الرابط الأصلي للموقع."
+        title: "دخول غير مصرح به",
+        desc: "يجب البدء من الصفحة الرئيسية واتباع الخطوات. الروابط المباشرة ممنوعة."
     }
   },
   en: defaultEn,
-  es: { 
-      ...defaultEn, 
-      header: { home: 'Inicio', contact: 'Contacto', share: 'Compartir' }, 
-      home: { title: 'Besoo Liker', subtitle: '100% Real y Seguro', desc: 'Aumenta tus publicaciones con un clic.', instant: 'Instantáneo', safe: 'Seguro', start: 'Empezar' },
-      info: { pageNum: 'Página 1 de 3', buttonReady: 'Continuar', buttonWait: 'Espera...', welcomeTitle: '⭐ Bienvenido', featuresTitle: '🚀 Características', feat1Title: 'Rápido:', feat1Desc: 'Reacciones reales.', feat2Title: 'Seguro:', feat2Desc: 'Sin contraseña.', feat3Title: 'Fácil:', feat3Desc: 'Interfaz simple.' },
-      faq: { pageNum: 'Página 2 de 3', title: '🌐 ¿Cómo funciona?', step1Title: 'Sin registro', step1Desc: 'Seguro.', step2Title: 'Copiar enlace', step2Desc: 'De la publicación.', step3Title: 'Enviar', step3Desc: 'Elige reacción.', step4Title: 'Resultados', step4Desc: 'Mira el contador.' },
-      timer: { finalStep: 'Paso Final', buttonGet: 'Continuar', buttonPrep: 'Cargando...', ready: '¡Listo!' },
-      final: { placeholder: 'Enlace del post', wait: 'Espera', send: 'Enviar', sending: 'Enviando...', toast: { ...defaultEn.final.toast, success: 'Éxito', error: 'Error', fill: 'Rellenar datos' } },
-      ban: { title: "Acceso Restringido", desc: "Actividad sospechosa.", timer: "Levantado en:" }, 
-      adblock: { title: "AdBlock Detectado", desc: "Desactiva AdBlock." } 
-  },
-  fr: { 
-      ...defaultEn, 
-      header: { home: 'Accueil', contact: 'Contact', share: 'Partager' }, 
-      home: { title: 'Besoo Liker', subtitle: '100% Vrai & Sûr', desc: 'Boostez vos posts en un clic.', instant: 'Instantané', safe: 'Sûr', start: 'Commencer' },
-      info: { pageNum: 'Page 1 sur 3', buttonReady: 'Continuer', buttonWait: 'Attendez...', welcomeTitle: '⭐ Bienvenue', featuresTitle: '🚀 Caractéristiques', feat1Title: 'Rapide:', feat1Desc: 'Réactions réelles.', feat2Title: 'Sûr:', feat2Desc: 'Pas de mot de passe.', feat3Title: 'Facile:', feat3Desc: 'Interface simple.' },
-      faq: { pageNum: 'Page 2 sur 3', title: '🌐 Comment ça marche?', step1Title: 'Pas d\'inscription', step1Desc: 'Sécurisé.', step2Title: 'Copier le lien', step2Desc: 'Du post.', step3Title: 'Envoyer', step3Desc: 'Choisir réaction.', step4Title: 'Résultats', step4Desc: 'Voir le compteur.' },
-      timer: { finalStep: 'Dernière étape', buttonGet: 'Continuer', buttonPrep: 'Chargement...', ready: 'Prêt!' },
-      final: { placeholder: 'Lien du post', wait: 'Attendez', send: 'Envoyer', sending: 'Envoi...', toast: { ...defaultEn.final.toast, success: 'Succès', error: 'Erreur', fill: 'Remplir les données' } },
-      ban: { title: "Accès Restreint", desc: "Activité suspecte.", timer: "Levé dans:" }, 
-      adblock: { title: "AdBlock Détecté", desc: "Désactivez AdBlock." }
-  },
-  de: { 
-      ...defaultEn, 
-      header: { home: 'Startseite', contact: 'Kontakt', share: 'Teilen' },
-      home: { title: 'Besoo Liker', subtitle: '100% Echt & Sicher', desc: 'Booste deine Beiträge mit einem Klick.', instant: 'Sofort', safe: 'Sicher', start: 'Starten' },
-      info: { pageNum: 'Seite 1 von 3', buttonReady: 'Weiter', buttonWait: 'Warten...', welcomeTitle: '⭐ Willkommen', featuresTitle: '🚀 Funktionen', feat1Title: 'Schnell:', feat1Desc: 'Echte Reaktionen.', feat2Title: 'Sicher:', feat2Desc: 'Kein Passwort.', feat3Title: 'Einfach:', feat3Desc: 'Einfache Oberfläche.' },
-      faq: { pageNum: 'Seite 2 von 3', title: '🌐 Wie funktioniert es?', step1Title: 'Keine Anmeldung', step1Desc: 'Sicher.', step2Title: 'Link kopieren', step2Desc: 'Vom Beitrag.', step3Title: 'Senden', step3Desc: 'Reaktion wählen.', step4Title: 'Ergebnisse', step4Desc: 'Zähler beobachten.' },
-      timer: { finalStep: 'Letzter Schritt', buttonGet: 'Weiter', buttonPrep: 'Laden...', ready: 'Bereit!' },
-      final: { placeholder: 'Beitragslink', wait: 'Warten', send: 'Senden', sending: 'Senden...', toast: { ...defaultEn.final.toast, success: 'Erfolg', error: 'Fehler', fill: 'Daten ausfüllen' } },
-      ban: { title: "Zugriff Beschränkt", desc: "Verdächtige Aktivität.", timer: "Aufgehoben in:" }, 
-      adblock: { title: "AdBlock Erkannt", desc: "Deaktiviere AdBlock." }
-  },
-  ru: { 
-      ...defaultEn, 
-      header: { home: 'Главная', contact: 'Контакты', share: 'Поделиться' },
-      home: { title: 'Besoo Liker', subtitle: '100% Реально и Безопасно', desc: 'Продвигайте посты одним кликом.', instant: 'Мгновенно', safe: 'Безопасно', start: 'Начать' },
-      info: { pageNum: 'Страница 1 из 3', buttonReady: 'Продолжить', buttonWait: 'Ждите...', welcomeTitle: '⭐ Добро пожаловать', featuresTitle: '🚀 Особенности', feat1Title: 'Быстро:', feat1Desc: 'Реальные реакции.', feat2Title: 'Безопасно:', feat2Desc: 'Без пароля.', feat3Title: 'Просто:', feat3Desc: 'Простой интерфейс.' },
-      faq: { pageNum: 'Страница 2 из 3', title: '🌐 Как это работает?', step1Title: 'Без регистрации', step1Desc: 'Безопасно.', step2Title: 'Копировать ссылку', step2Desc: 'Поста.', step3Title: 'Отправить', step3Desc: 'Выбрать реакцию.', step4Title: 'Результаты', step4Desc: 'Смотреть счетчик.' },
-      timer: { finalStep: 'Финальный шаг', buttonGet: 'Продолжить', buttonPrep: 'Загрузка...', ready: 'Готово!' },
-      final: { placeholder: 'Ссылка на пост', wait: 'Ждите', send: 'Отправить', sending: 'Отправка...', toast: { ...defaultEn.final.toast, success: 'Успех', error: 'Ошибка', fill: 'Заполните данные' } },
-      ban: { title: "Доступ Ограничен", desc: "Подозрительная активность.", timer: "Снято через:" }, 
-      adblock: { title: "AdBlock Обнаружен", desc: "Отключите AdBlock." }
-  },
-  zh: { 
-      ...defaultEn, 
-      header: { home: '首页', contact: '联系我们', share: '分享' },
-      home: { title: 'Besoo Liker', subtitle: '100% 真实安全', desc: '一键提升帖子热度。', instant: '即时', safe: '安全', start: '开始' },
-      info: { pageNum: '第 1 页，共 3 页', buttonReady: '继续', buttonWait: '请稍候...', welcomeTitle: '⭐ 欢迎', featuresTitle: '🚀以此', feat1Title: '快速:', feat1Desc: '真实反应。', feat2Title: '安全:', feat2Desc: '无需密码。', feat3Title: '简单:', feat3Desc: '界面简洁。' },
-      timer: { finalStep: '最后一步', buttonGet: '继续', buttonPrep: '加载中...', ready: '准备就绪！' },
-      final: { placeholder: '帖子链接', wait: '等待', send: '发送', sending: '发送中...', toast: { ...defaultEn.final.toast, success: '成功', error: '错误', fill: '填写数据' } },
-      ban: { title: "访问受限", desc: "可疑活动。", timer: "解禁时间:" }, 
-      adblock: { title: "检测到广告拦截", desc: "请关闭广告拦截。" }
-  },
-  pt: { 
-      ...defaultEn, 
-      header: { home: 'Início', contact: 'Contato', share: 'Compartilhar' },
-      home: { title: 'Besoo Liker', subtitle: '100% Real e Seguro', desc: 'Impulsione seus posts com um clique.', instant: 'Instantâneo', safe: 'Seguro', start: 'Começar' },
-      info: { pageNum: 'Página 1 de 3', buttonReady: 'Continuar', buttonWait: 'Aguarde...', welcomeTitle: '⭐ Bem-vindo', featuresTitle: '🚀 Recursos', feat1Title: 'Rápido:', feat1Desc: 'Reações reais.', feat2Title: 'Seguro:', feat2Desc: 'Sem senha.', feat3Title: 'Fácil:', feat3Desc: 'Interface simples.' },
-      timer: { finalStep: 'Passo Final', buttonGet: 'Continuar', buttonPrep: 'Carregando...', ready: 'Pronto!' },
-      final: { placeholder: 'Link do post', wait: 'Aguarde', send: 'Enviar', sending: 'Enviando...', toast: { ...defaultEn.final.toast, success: 'Sucesso', error: 'Erro', fill: 'Preencher dados' } },
-      ban: { title: "Acesso Restrito", desc: "Atividade suspeita.", timer: "Liberado em:" }, 
-      adblock: { title: "AdBlock Detectado", desc: "Desative o AdBlock." }
-  },
+  es: { ...defaultEn },
+  fr: { ...defaultEn },
+  de: { ...defaultEn },
+  ru: { ...defaultEn },
+  zh: { ...defaultEn },
+  pt: { ...defaultEn },
 };
 
 export type Lang = 'ar' | 'en' | 'es' | 'fr' | 'de' | 'ru' | 'zh' | 'pt';

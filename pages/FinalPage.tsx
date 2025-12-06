@@ -79,31 +79,80 @@ const FinalPage: React.FC = () => {
   };
 
   const getDeviceId = async () => {
-      // استخدام البصمة الرقمية الآمنة
       return await SecureStorage.generateFingerprint();
   };
 
   const handleSend = async () => {
-    // 0. التحقق من المصيدة (Honeypot) - إذا كان الحقل ممتلئاً فهو بوت (تجاوز للأدمن)
+    setLoading(true);
+
+    // --- SECURITY FIREWALL ---
+    // إذا كان هناك أي انتهاك، توقف فوراً ولا ترسل شيئاً للبوت
+    
+    // 1. Honeypot Check (Bots)
     if (honeypot && !isAdmin) {
-        // حظر صامت للبوت (إيهامه بالنجاح أو الخطأ دون إرسال داتا)
+        setLoading(false);
         showToast(t.final.toast.bot || "Bot Detected", "error");
-        return;
+        return; // STOP
     }
+
+    // 2. Strict Link/Sequence Check (Copy Paste Prevention)
+    const step1 = sessionStorage.getItem('step1_completed');
+    const step2 = sessionStorage.getItem('step2_completed');
+    const step3 = sessionStorage.getItem('step3_completed');
+    if ((!step1 || !step2 || !step3) && !isAdmin) {
+        setLoading(false);
+        showToast(t.shortener?.title || "Sequence Error", "error");
+        // Optional: Ban malicious user
+        await SecureStorage.setBan(Date.now() + 3600000); 
+        setTimeout(() => navigate('/'), 2000);
+        return; // STOP
+    }
+
+    // 3. Incognito Check
+    const isIncognito = await SecureStorage.isIncognitoMode();
+    if (isIncognito && !isAdmin) {
+        setLoading(false);
+        showToast("Incognito Mode Not Allowed", "error");
+        window.location.reload();
+        return; // STOP
+    }
+
+    // 4. Existing Ban Check (Fingerprint)
+    const existingBan = await SecureStorage.getBan();
+    if (existingBan && existingBan > Date.now() && !isAdmin) {
+         setLoading(false);
+         showToast(t.ban?.title || "Banned", "error");
+         window.location.reload();
+         return; // STOP
+    }
+
+    // 5. AdBlock Check (Network level)
+    try {
+        await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { method: 'HEAD', mode: 'no-cors' });
+    } catch (e) {
+        // Likely AdBlock
+        if (!isAdmin) {
+            setLoading(false);
+            showToast(t.adblock?.title || "AdBlock Detected", "error");
+            return; // STOP
+        }
+    }
+
+    // --- END SECURITY FIREWALL ---
 
     const fbRegex = /^(https?:\/\/)?(www\.|web\.|m\.|mobile\.)?(facebook\.com|fb\.watch|fb\.com|fb\.me)\/.+/i;
     const cleanLink = sanitizeInput(link);
 
     if (!cleanLink || selectedEmojis.length === 0) {
+      setLoading(false);
       showToast(t.final.toast.fill, "error");
       return;
     }
     if (!fbRegex.test(cleanLink)) {
+        setLoading(false);
         showToast(t.final.toast.invalidFb, "error");
         return;
     }
-
-    setLoading(true);
 
     // 1. الحصول على اسم التطبيق
     const appName = t.home.title;

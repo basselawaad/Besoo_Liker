@@ -43,9 +43,15 @@ const Header: React.FC = () => {
       // هذا يمنع تجاوز الخطوات عن طريق مشاركة رابط صفحة داخلية
       const urlToShare = window.location.origin;
 
+      // Custom professional share message
+      const shareTitle = lang === 'ar' ? 'زيادة لايكات فيسبوك مجاناً' : 'Free Facebook Likes';
+      const shareText = lang === 'ar' 
+        ? "🚀 أقوى موقع لزيادة لايكات فيسبوك مجاناً! \n💯 تفاعل حقيقي ومضمون 100% \n🔒 آمن تماماً وبدون كلمة سر \nجربه الآن 👇"
+        : "🚀 Best site to increase Facebook Likes for FREE! \n💯 100% Real & Safe Engagement \n🔒 No Password Required \nTry it now 👇";
+
       const shareData = {
-          title: 'Besoo Liker',
-          text: t.home.desc,
+          title: shareTitle,
+          text: shareText,
           url: urlToShare
       };
 
@@ -94,7 +100,9 @@ const Header: React.FC = () => {
       }
 
       // 3. النسخ للحافظة (للحاسوب أو عند فشل المشاركة)
-      const success = await robustCopy(urlToShare);
+      // ننسخ الرابط مع نص قصير إذا كان نسخاً يدوياً
+      const textToCopy = `${shareText}\n${urlToShare}`;
+      const success = await robustCopy(textToCopy);
       
       if (success) {
           setShowCopyFeedback(true);

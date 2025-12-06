@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { HashRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertTriangle, EyeOff, ShieldAlert, Ban, MonitorX, Link2Off, Clock, Terminal, Code2, Loader2 } from 'lucide-react';
+import { AlertTriangle, EyeOff, ShieldAlert, Ban, MonitorX, Link2Off, Clock, Terminal, Code2, Loader2, Lock } from 'lucide-react';
 
 // تأكد من تطابق أسماء الملفات مع المجلدات
 import Header from './components/Header';
@@ -76,18 +76,13 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
 
     // --- REFRESH PROTECTION LOGIC ---
     useEffect(() => {
-        // التحقق مما إذا كان تحميل الصفحة ناتج عن تحديث (Refresh)
-        // إذا كان كذلك، والصفحة ليست الرئيسية، نعيد المستخدم للبداية
         try {
             const navEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
             if (navEntry && navEntry.type === 'reload' && location.pathname !== '/') {
-                // مسح الجلسة لضمان البدء من الصفر
                 sessionStorage.clear();
-                window.location.replace('/'); // استبدال الرابط بدلاً من التنقل لمنع زر الرجوع
+                window.location.replace('/');
             }
-        } catch (e) {
-            // Fallback for older browsers
-        }
+        } catch (e) {}
     }, []);
 
     // --- ADMIN UNBAN CHECK (IMMEDIATE) ---
@@ -100,7 +95,6 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
                 setIsUnlocking(true);
                 SecureStorage.removeBan();
                 SecureStorage.setAdmin();
-                // مسح الرابط بعد فترة قصيرة
                 setTimeout(() => {
                    window.location.href = window.location.pathname;
                 }, 2000);
@@ -122,7 +116,6 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
     useEffect(() => {
         if (isUnlocking || isUnlockUrl || SecureStorage.isAdmin()) return;
 
-        // This function checks the ban status from storage and fingerprint
         const checkBanStatus = async () => {
              const banTimestamp = await SecureStorage.getBan();
              if (banTimestamp) {
@@ -130,7 +123,6 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
                     setBanState('banned');
                     setBanEndTime(banTimestamp);
                 } else {
-                    // Ban expired
                     SecureStorage.removeBan();
                     setBanState('none');
                     setBanEndTime(null);
@@ -140,13 +132,9 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
              }
         };
 
-        // 1. Check immediately on mount
         checkBanStatus();
-
-        // 2. Poll every second
         const intervalId = setInterval(checkBanStatus, 1000);
 
-        // 3. Listen to storage events
         const handleStorageChange = (e: StorageEvent) => {
             if (e.key === null || e.key.includes(BAN_KEY) || e.key.includes("sys")) {
                 checkBanStatus();
@@ -162,20 +150,16 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
 
     // --- NAVIGATION & REFERRER CHECKS ---
     useEffect(() => {
-        // إذا كان المستخدم أدمن، تجاوز كل الفحوصات
         if (SecureStorage.isAdmin() || isUnlocking || isUnlockUrl) return;
-
-        // If already banned, skip further checks
         if (banState === 'banned') return;
 
-        // دالة تطبيق الحظر لمدة 24 ساعة
         const applyBan = () => {
              const existingBan = SecureStorage.getBan().then(val => {
                  if (val && val > Date.now()) {
                      setBanState('banned');
                      setBanEndTime(val);
                  } else {
-                     const banDuration = 24 * 60 * 60 * 1000; // 24 Hours
+                     const banDuration = 24 * 60 * 60 * 1000;
                      const endTime = Date.now() + banDuration;
                      SecureStorage.setBan(endTime);
                      setBanState('banned');
@@ -202,18 +186,18 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
             return;
         }
 
-        // 3. Sequence Check (Prevent skipping steps)
+        // 3. Sequence Check (Prevent skipping steps or copying links)
         if (location.pathname !== '/') {
             const sessionActive = sessionStorage.getItem('session_active');
             
+            // تحقق صارم من مفاتيح الجلسة
             const isStep1Violation = location.pathname === '/step-1' && !sessionActive;
             const isStep2Violation = location.pathname === '/step-2' && !sessionStorage.getItem('step1_completed');
             const isStep3Violation = location.pathname === '/step-3' && !sessionStorage.getItem('step2_completed');
             const isFinalViolation = location.pathname === '/destination' && !sessionStorage.getItem('step3_completed');
 
             if (isStep1Violation || isStep2Violation || isStep3Violation || isFinalViolation) {
-                // STRICT PUNISHMENT ENABLED: Ban user if they try to skip steps
-                applyBan();
+                setBanState('shortener'); // Show Shortener/Direct access block message
             }
         }
     }, [location, banState, isUnlocking, isUnlockUrl]);
@@ -255,11 +239,9 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
                     animate={{ scale: 1, opacity: 1 }}
                     className="bg-red-950/80 border-2 border-red-600 rounded-3xl p-10 max-w-lg shadow-[0_0_80px_rgba(220,38,38,0.4)] backdrop-blur-md"
                 >
-                    {/* Secret Button Wrapper */}
                     <div 
                         onClick={handleSecretUnban} 
                         className="bg-red-600/20 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/30 cursor-pointer active:scale-95 transition-transform"
-                        title="Restricted Area"
                     >
                         <Ban className="w-12 h-12 text-red-500 stroke-[2.5px]" />
                     </div>
@@ -268,7 +250,6 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
                         {t.ban?.desc || "Suspicious activity detected."}
                     </p>
                     
-                    {/* Countdown Display */}
                     <div className="flex flex-col items-center gap-2">
                         <p className="text-red-300 font-bold text-sm uppercase tracking-wider flex items-center gap-2">
                              <Clock className="w-4 h-4" />
@@ -301,6 +282,9 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
                     <p className="text-gray-200 text-lg font-bold leading-relaxed mb-6">
                         {t.shortener?.desc || "Access via URL shorteners is prohibited."}
                     </p>
+                     <button onClick={() => window.location.replace('/')} className="bg-orange-500 text-black font-black py-3 px-8 rounded-xl hover:bg-orange-400 transition-colors w-full">
+                        {lang === 'ar' ? 'الذهاب للرئيسية' : 'Go to Home'}
+                    </button>
                 </motion.div>
             </div>
         );
@@ -333,22 +317,17 @@ const AnimatedRoutes = () => {
 const App: React.FC = () => {
   // دالة الكشف التلقائي عن اللغة
   const getInitialLang = (): Lang => {
-    // 1. التحقق من التخزين المحلي أولاً
     const storedLang = localStorage.getItem('besoo_app_lang');
     if (storedLang && translations[storedLang as Lang]) {
         return storedLang as Lang;
     }
-
-    // 2. التحقق من لغة المتصفح
     try {
-        const browserLang = navigator.language.split('-')[0]; // ex: 'ar', 'en'
+        const browserLang = navigator.language.split('-')[0];
         const supportedLangs = ['ar', 'en', 'es', 'fr', 'de', 'pt', 'ru', 'zh'];
         if (supportedLangs.includes(browserLang)) {
             return browserLang as Lang;
         }
     } catch (e) {}
-
-    // 3. الافتراضي
     return 'ar';
   };
 
@@ -356,7 +335,6 @@ const App: React.FC = () => {
   const [showSecurityWarning, setShowSecurityWarning] = useState(false);
   const [isIncognito, setIsIncognito] = useState(false);
   const [isAdBlockActive, setIsAdBlockActive] = useState(false);
-  const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   // تحديث اللغة وحفظها
@@ -379,19 +357,19 @@ const App: React.FC = () => {
       setIsAdmin(SecureStorage.isAdmin());
   }, []);
 
-  // AdBlock Detection Logic - Enhanced to catch Brave
+  // AdBlock Detection Logic
   useEffect(() => {
     if (SecureStorage.isAdmin()) return;
 
     const detectAdBlock = async () => {
-       // Method 1: Check for Brave Browser explicitly
+       // Method 1: Check for Brave
        // @ts-ignore
        if (navigator.brave && await navigator.brave.isBrave()) {
            setIsAdBlockActive(true);
            return;
        }
 
-       // Method 2: Bait Element
+       // Method 2: Bait
        const bait = document.createElement('div');
        bait.className = 'pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads text-ad-links ad-banner adsbox ad-blocker-bait banner_ad';
        bait.style.cssText = 'height: 1px !important; width: 1px !important; position: absolute !important; left: -9999px !important; top: -9999px !important;';
@@ -418,7 +396,7 @@ const App: React.FC = () => {
           document.body.removeChild(bait);
        }, 200);
 
-       // Method 3: Network Request Check (Most effective against Brave)
+       // Method 3: Network Check
        try {
            await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { 
                method: 'HEAD', 
@@ -430,25 +408,19 @@ const App: React.FC = () => {
     };
 
     detectAdBlock();
-
-    // Continuous Check
     const interval = setInterval(detectAdBlock, 2000);
     return () => clearInterval(interval);
   }, []);
 
-  // Incognito Detection
+  // Strict Incognito Detection
   useEffect(() => {
     if (SecureStorage.isAdmin()) return;
 
     const detectIncognito = async () => {
-        try {
-            if ('storage' in navigator && 'estimate' in navigator.storage) {
-                const { quota } = await navigator.storage.estimate();
-                if (quota && quota < 200 * 1024 * 1024) { 
-                    setIsIncognito(true);
-                }
-            }
-        } catch (e) {}
+        const isPrivate = await SecureStorage.isIncognitoMode();
+        if (isPrivate) {
+            setIsIncognito(true);
+        }
     };
     detectIncognito();
   }, []);
@@ -457,13 +429,28 @@ const App: React.FC = () => {
   useEffect(() => {
     if (SecureStorage.isAdmin()) return;
 
-    const preventCopy = (e: ClipboardEvent) => { e.preventDefault(); };
-    
-    // منع كامل للقائمة المنبثقة (Right Click)
-    const preventContext = (e: MouseEvent) => {
-        e.preventDefault();
+    const triggerSecurityAlert = () => {
         setShowSecurityWarning(true);
-        setTimeout(() => setShowSecurityWarning(false), 3000);
+        setTimeout(() => setShowSecurityWarning(false), 3500);
+    };
+
+    const preventCopy = (e: ClipboardEvent) => { 
+        const target = e.target as HTMLElement;
+        // Allow copy/cut only in inputs
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+            return;
+        }
+        e.preventDefault(); 
+    };
+
+    const preventContext = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        // Allow right-click ONLY in inputs/textareas to allow pasting
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+            return;
+        }
+        e.preventDefault();
+        triggerSecurityAlert();
     };
     
     document.addEventListener('contextmenu', preventContext);
@@ -485,74 +472,31 @@ const App: React.FC = () => {
             (e.ctrlKey && e.key === 'U') ||
             (e.metaKey && e.altKey && (e.key === 'i' || e.key === 'j' || e.key === 'c')) || 
             (e.metaKey && e.key === 'u') ||
-            (e.ctrlKey && (e.key === 's' || e.key === 'S')) // منع الحفظ
+            (e.ctrlKey && (e.key === 's' || e.key === 'S'))
         ) {
             e.preventDefault();
             e.stopPropagation();
-            setShowSecurityWarning(true);
-            setTimeout(() => setShowSecurityWarning(false), 3000);
+            triggerSecurityAlert();
             return false;
         }
     };
 
-    // اكتشاف DevTools عن طريق التأخير في التنفيذ (Debugger Loop)
-    const antiDebugInterval = setInterval(() => {
-        const start = Date.now();
-        // eslint-disable-next-line no-debugger
-        debugger; 
-        const end = Date.now();
-        // إذا كان الفرق أكثر من 100ms، فهذا يعني أن المتصفح توقف عند نقطة debugger (DevTools مفتوح)
-        if (end - start > 100) {
-             setIsDevToolsOpen(true);
-        }
-    }, 1000);
-
-    // التحقق من تغيير حجم النافذة بشكل مريب (Docked DevTools)
-    const handleResize = () => {
-        const widthThreshold = window.outerWidth - window.innerWidth > 160;
-        const heightThreshold = window.outerHeight - window.innerHeight > 160;
-        if ((widthThreshold || heightThreshold) && !SecureStorage.isAdmin()) {
-            // يمكن تفعيله إذا كنت تريد صرامة أكثر، لكن debugger loop أدق
-            // setIsDevToolsOpen(true); 
-        }
-    };
-    window.addEventListener('resize', handleResize);
-
     document.addEventListener('keydown', handleKeyDown);
+
+    // تم حذف الحلقات التكرارية (Intervals) التي كانت تسبب ظهور التنبيه بشكل تلقائي
+    // الآن يظهر التنبيه فقط عند حدوث Interception للأزرار أعلاه
 
     return () => {
         document.removeEventListener('contextmenu', preventContext);
         document.removeEventListener('keydown', handleKeyDown);
         document.removeEventListener('copy', preventCopy);
         document.removeEventListener('cut', preventCopy);
-        window.removeEventListener('resize', handleResize);
-        clearInterval(antiDebugInterval);
+        
+        // Cleanup removed intervals is not needed as they are removed
     };
   }, []);
 
   const t = translations[lang] || translations.en;
-
-  // BLOCK SCREEN: DevTools Open
-  if (isDevToolsOpen) {
-    return (
-        <div className={`min-h-screen flex flex-col items-center justify-center bg-black text-white p-6 text-center ${lang === 'ar' ? 'rtl' : 'ltr'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-            <div className="bg-zinc-900 border border-red-600 rounded-3xl p-10 max-w-lg shadow-[0_0_50px_rgba(220,38,38,0.3)]">
-                <Code2 className="w-20 h-20 text-red-500 mx-auto mb-6" />
-                <h1 className="text-3xl font-black text-red-500 mb-4">{t.security?.alert || "Security Alert"}</h1>
-                <p className="text-gray-300 text-lg font-bold leading-relaxed mb-6">
-                    {lang === 'ar' ? 'تم اكتشاف أدوات المطور (DevTools). يرجى إغلاقها للمتابعة.' : 'Developer Tools detected. Please close them to continue.'}
-                </p>
-                <div className="bg-red-950/50 p-4 rounded-xl border border-red-500/20 text-red-300 text-sm font-semibold">
-                    <ShieldAlert className="w-5 h-5 inline-block mx-2 mb-1" />
-                    Access denied for security reasons.
-                </div>
-                <button onClick={() => window.location.reload()} className="mt-6 bg-red-600 text-white font-bold py-3 px-8 rounded-xl hover:bg-red-500 transition-colors">
-                    {lang === 'ar' ? 'تحديث الصفحة' : 'Reload Page'}
-                </button>
-            </div>
-        </div>
-    );
-  }
 
   // BLOCK SCREEN: Incognito
   if (isIncognito) {
@@ -566,7 +510,7 @@ const App: React.FC = () => {
                 </p>
                 <div className="bg-red-950/50 p-4 rounded-xl border border-red-500/20 text-red-300 text-sm font-semibold">
                     <ShieldAlert className="w-5 h-5 inline-block mx-2 mb-1" />
-                    System requires storage access to persist timer data properly.
+                    Security requirement: Persistent storage access.
                 </div>
             </div>
         </div>
@@ -603,20 +547,20 @@ const App: React.FC = () => {
           
           <Footer />
 
+          {/* New Toast-style Security Warning - Text Only, Simple, Disappears */}
           <AnimatePresence>
             {showSecurityWarning && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none p-4">
+                <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[10000] pointer-events-none w-full flex justify-center px-4">
                     <motion.div 
-                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                        className="bg-red-950/90 border-2 border-red-500/50 p-6 rounded-2xl shadow-[0_0_50px_rgba(220,38,38,0.5)] backdrop-blur-xl flex flex-col items-center text-center max-w-sm pointer-events-auto"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        transition={{ duration: 0.2 }}
+                        className="bg-zinc-900/95 text-white px-6 py-3 rounded-full shadow-lg border border-zinc-700/50 backdrop-blur-md max-w-xs text-center"
                     >
-                        <div className="bg-red-500/20 p-3 rounded-full mb-3">
-                             <AlertTriangle className="w-8 h-8 text-red-500" />
-                        </div>
-                        <h3 className="text-xl font-black text-red-500 mb-2">{t.security?.alert || "Security Alert"}</h3>
-                        <p className="text-white font-bold">{t.security?.desc || "Developer tools are not allowed."}</p>
+                         <span className="font-bold text-sm tracking-wide text-gray-200">
+                             {t.security?.desc || "Security Restriction"}
+                         </span>
                     </motion.div>
                 </div>
             )}
