@@ -42,8 +42,8 @@ const LoginPage: React.FC = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-            // توجيه المستخدم لرابط /home كما هو محدد في إعدادات Google Cloud
-            redirectTo: 'https://besooliker.vercel.app/home', 
+            // العودة إلى الرابط الرئيسي لتجنب مشاكل التوجيه في Vercel مع HashRouter
+            redirectTo: 'https://besooliker.vercel.app', 
         }
       });
 
