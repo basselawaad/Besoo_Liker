@@ -8,7 +8,7 @@ const FAQPage: React.FC = () => {
   const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState(20);
   const [canProceed, setCanProceed] = useState(false);
-  const { lang } = useAppConfig();
+  const { t, lang } = useAppConfig();
 
   useEffect(() => {
     if (!sessionStorage.getItem('step1_completed')) {
@@ -35,23 +35,23 @@ const FAQPage: React.FC = () => {
   const steps = [
     { 
         icon: <LogIn className="w-6 h-6 text-blue-400" />,
-        title: "1️⃣ تسجيل الدخول", 
-        desc: "سجّل دخولك من خلال حساب فيسبوك بسهولة وأمان، دون أي نشر تلقائي على صفحتك." 
+        title: t.faq.step1Title, 
+        desc: t.faq.step1Desc 
     },
     { 
         icon: <MousePointer2 className="w-6 h-6 text-purple-400" />,
-        title: "2️⃣ تحديد المنشور", 
-        desc: "اختر المنشور أو الصورة التي تريد تعزيز ظهورها وزيادة التفاعل عليها." 
+        title: t.faq.step2Title, 
+        desc: t.faq.step2Desc 
     },
     { 
         icon: <PlayCircle className="w-6 h-6 text-green-400" />,
-        title: "3️⃣ تنفيذ العملية", 
-        desc: "يبدأ النظام تلقائيًا في إرسال الإعجابات والتفاعلات المطلوبة فوراً." 
+        title: t.faq.step3Title, 
+        desc: t.faq.step3Desc 
     },
     { 
         icon: <BarChart3 className="w-6 h-6 text-yellow-400" />,
-        title: "4️⃣ مشاهدة النتائج", 
-        desc: "راقب تفاعل منشوراتك يرتفع بشكل ملموس خلال دقائق معدودة!" 
+        title: t.faq.step4Title, 
+        desc: t.faq.step4Desc 
     }
   ];
 
@@ -66,18 +66,18 @@ const FAQPage: React.FC = () => {
         
         <div className="text-center mb-8">
             <h1 className="text-2xl md:text-3xl font-black text-yellow-400 mb-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-                🌐 كيف يعمل Besoo Liker؟
+                {t.faq.title}
             </h1>
-            <p className="text-gray-400 font-bold text-sm">خطوات بسيطة لزيادة تفاعلك</p>
+            <p className="text-gray-400 font-bold text-sm">{t.faq.sub}</p>
         </div>
 
-        <div className="space-y-4 mb-8" dir="rtl">
+        <div className="space-y-4 mb-8" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
             {steps.map((step, idx) => (
                 <div key={idx} className="flex items-start gap-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5 hover:border-yellow-500/20 transition-all">
                     <div className="mt-1 bg-black/40 p-2 rounded-lg border border-white/5">
                         {step.icon}
                     </div>
-                    <div className="text-right">
+                    <div className={lang === 'ar' ? 'text-right' : 'text-left'}>
                         <h3 className="text-white font-black text-base mb-1">{step.title}</h3>
                         <p className="text-gray-400 text-sm font-medium leading-relaxed">
                             {step.desc}
@@ -94,7 +94,7 @@ const FAQPage: React.FC = () => {
                 <span className="text-blue-500 font-black font-mono text-xl">
                     {canProceed ? '0' : timeLeft}
                 </span>
-                <span className="text-gray-500 text-xs font-bold uppercase">Seconds</span>
+                <span className="text-gray-500 text-xs font-bold uppercase">{t.faq.seconds}</span>
             </div>
 
             <button 
@@ -104,8 +104,12 @@ const FAQPage: React.FC = () => {
                     canProceed ? 'bg-blue-500 text-white hover:bg-blue-400 hover:scale-[1.02] shadow-[0_0_20px_rgba(59,130,246,0.4)]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
                 }`}
             >
-                {canProceed ? "اضغط هنا للمتابعة" : "يرجى الانتظار..."}
-                {canProceed && <ArrowLeft className="w-6 h-6 stroke-[3px]" />}
+                {canProceed ? t.faq.buttonProceed : t.faq.buttonWait}
+                {canProceed && (
+                    <>
+                        {lang === 'ar' ? <ArrowLeft className="w-6 h-6 stroke-[3px]" /> : <ArrowLeft className="w-6 h-6 stroke-[3px] rotate-180" />}
+                    </>
+                )}
             </button>
         </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, X, MessageCircle, ExternalLink, ChevronDown, Check, ShieldCheck, Share2, Copy } from 'lucide-react';
+import { Menu, X, MessageCircle, ExternalLink, ChevronDown, Check, ShieldCheck, Share2, LogOut, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppConfig, Lang } from '../store';
 
@@ -17,7 +17,7 @@ const languages: { code: Lang; name: string; flag: string }[] = [
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
-  const { lang, setLang, t, isAdmin } = useAppConfig();
+  const { lang, setLang, t, isAdmin, currentUser, logout } = useAppConfig();
   const langMenuRef = useRef<HTMLDivElement>(null);
   const [showCopyFeedback, setShowCopyFeedback] = useState(false);
 
@@ -38,12 +38,7 @@ const Header: React.FC = () => {
   };
 
   const handleShare = async () => {
-      // SECURITY FIX: 
-      // ننسخ فقط الرابط الرئيسي (الروت) لضمان أن أي شخص يفتح الرابط يبدأ من البداية
-      // هذا يمنع تجاوز الخطوات عن طريق مشاركة رابط صفحة داخلية
       const urlToShare = window.location.origin;
-
-      // استخدام النصوص المترجمة ديناميكياً
       const shareTitle = t.header.shareTitle;
       const shareText = t.header.shareText;
 
@@ -53,31 +48,24 @@ const Header: React.FC = () => {
           url: urlToShare
       };
 
-      // دالة مساعدة للنسخ القوي (تعمل على كل المتصفحات)
       const robustCopy = async (text: string) => {
           try {
-              // المحاولة الأولى: API الحديث
               if (navigator.clipboard && window.isSecureContext) {
                   await navigator.clipboard.writeText(text);
                   return true;
               }
               throw new Error("Clipboard API unavailable");
           } catch (err) {
-              // المحاولة الثانية: الطريقة التقليدية (Fallback)
               try {
                   const textArea = document.createElement("textarea");
                   textArea.value = text;
-                  
-                  // تنسيق لإخفاء العنصر مع إبقائه جزءاً من الصفحة
                   textArea.style.position = "fixed";
                   textArea.style.left = "-9999px";
                   textArea.style.top = "0";
                   textArea.setAttribute('readonly', '');
-                  
                   document.body.appendChild(textArea);
                   textArea.focus();
                   textArea.select();
-                  
                   const successful = document.execCommand('copy');
                   document.body.removeChild(textArea);
                   return successful;
@@ -87,18 +75,13 @@ const Header: React.FC = () => {
           }
       };
 
-      // 2. محاولة المشاركة الأصلية (للموبايل)
       if (navigator.share) {
           try {
               await navigator.share(shareData);
-              return; // تم بنجاح عبر قائمة المشاركة
-          } catch (err) {
-              // إذا ألغى المستخدم أو فشل، نكمل للنسخ اليدوي
-          }
+              return;
+          } catch (err) {}
       }
 
-      // 3. النسخ للحافظة (للحاسوب أو عند فشل المشاركة)
-      // ننسخ الرابط مع نص قصير إذا كان نسخاً يدوياً
       const textToCopy = `${shareText}\n${urlToShare}`;
       const success = await robustCopy(textToCopy);
       
@@ -114,7 +97,7 @@ const Header: React.FC = () => {
     <header className="w-full bg-black border-b border-yellow-600 shadow-[0_4px_8px_rgba(255,255,0,0.1)] sticky top-0 z-50 transition-colors duration-300">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between relative">
         
-        {/* Left Section: Language Dropdown + Admin Badge */}
+        {/* Left Section: Language Dropdown + Admin Badge + User */}
         <div className="flex items-center gap-3">
             <div className="relative z-50" ref={langMenuRef}>
               <button 
@@ -162,13 +145,22 @@ const Header: React.FC = () => {
         </div>
 
         {/* Right Section: Menu Toggle */}
-        <button 
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="p-2 text-yellow-400 hover:bg-yellow-400/10 rounded-lg transition-colors z-50 focus:outline-none"
-          aria-label="Toggle menu"
-        >
-          {isMenuOpen ? <X className="w-8 h-8 stroke-[3px]" /> : <Menu className="w-8 h-8 stroke-[3px]" />}
-        </button>
+        <div className="flex items-center gap-3">
+            {currentUser && (
+                <div className="hidden md:flex items-center gap-2 text-gray-300 bg-zinc-900 px-3 py-2 rounded-lg border border-gray-800">
+                    <User className="w-4 h-4" />
+                    <span className="text-sm font-bold truncate max-w-[100px]">{currentUser.name}</span>
+                </div>
+            )}
+            
+            <button 
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="p-2 text-yellow-400 hover:bg-yellow-400/10 rounded-lg transition-colors z-50 focus:outline-none"
+                aria-label="Toggle menu"
+            >
+                {isMenuOpen ? <X className="w-8 h-8 stroke-[3px]" /> : <Menu className="w-8 h-8 stroke-[3px]" />}
+            </button>
+        </div>
 
         {/* Dropdown Menu */}
         <AnimatePresence>
@@ -191,6 +183,17 @@ const Header: React.FC = () => {
                 className={`absolute top-20 ${lang === 'ar' ? 'left-4' : 'right-4'} min-w-[220px] bg-[#1e293b] border border-yellow-600/50 rounded-xl shadow-2xl z-50 overflow-hidden`}
               >
                 <div className="p-3 space-y-2">
+                  {/* Mobile User Info */}
+                  {currentUser && (
+                    <div className="md:hidden flex items-center gap-3 p-3 mb-2 rounded-lg bg-white/5 border border-white/10">
+                        <User className="w-5 h-5 text-gray-400" />
+                        <div className="flex flex-col">
+                            <span className="text-yellow-400 font-bold text-sm">{currentUser.name}</span>
+                            <span className="text-gray-500 text-xs truncate max-w-[150px]">{currentUser.email}</span>
+                        </div>
+                    </div>
+                  )}
+
                   {/* Mobile Admin Badge */}
                   {isAdmin && (
                     <div className="md:hidden flex items-center gap-2 p-3 mb-2 rounded-lg bg-yellow-400/10 border border-yellow-500/30">
@@ -219,6 +222,21 @@ const Header: React.FC = () => {
                      {showCopyFeedback ? <Check className="w-5 h-5" /> : <Share2 className="w-5 h-5 stroke-[2.5px]" />}
                      <span>{showCopyFeedback ? t.system.copy : t.header.share}</span>
                   </button>
+
+                  {/* Logout Button */}
+                  {currentUser && (
+                    <button
+                        onClick={() => {
+                            logout();
+                            setIsMenuOpen(false);
+                            window.location.reload();
+                        }}
+                        className="flex items-center gap-3 w-full p-4 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-all duration-200 font-black text-base mt-2 border-t border-white/10"
+                    >
+                        <LogOut className="w-5 h-5 stroke-[2.5px]" />
+                        <span>{t.auth.logout}</span>
+                    </button>
+                  )}
                 </div>
               </motion.div>
             </>

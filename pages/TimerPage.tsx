@@ -8,7 +8,7 @@ const TimerPage: React.FC = () => {
   const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState(20);
   const [canProceed, setCanProceed] = useState(false);
-  const { lang } = useAppConfig();
+  const { t, lang } = useAppConfig();
 
   useEffect(() => {
     if (!sessionStorage.getItem('step2_completed')) {
@@ -33,13 +33,13 @@ const TimerPage: React.FC = () => {
   };
 
   const faqs = [
-    { q: "هل Besoo Liker آمن؟", a: "نعم، فهو يعتمد بروتوكولات أمان قوية لحماية بياناتك دون تخزين أي معلومات شخصية." },
-    { q: "هل التفاعلات حقيقية؟", a: "تمامًا، جميع الإعجابات تأتي من مستخدمين حقيقيين." },
-    { q: "هل يمكنني اختيار منشورات معينة؟", a: "نعم، يمكنك التحكم الكامل في اختيار المنشور الذي ترغب في تعزيزه." },
-    { q: "كم من الوقت يستغرق وصول الإعجابات؟", a: "في العادة ستظهر خلال دقائق قليلة فقط." },
-    { q: "هل هناك حد يومي؟", a: "نعم، وذلك حفاظًا على سلامة حسابك وتقليل أي مخاطر محتملة." },
-    { q: "هل يناسب الاستخدام التجاري؟", a: "بالطبع، فهو مثالي للشركات والمؤثرين والمسوقين." },
-    { q: "هل يتطلب تثبيت برنامج؟", a: "لا، النظام يعمل من خلال الويب فقط دون أي تحميل." }
+    { q: t.timer.q1, a: t.timer.a1 },
+    { q: t.timer.q2, a: t.timer.a2 },
+    { q: t.timer.q3, a: t.timer.a3 },
+    { q: t.timer.q4, a: t.timer.a4 },
+    { q: t.timer.q5, a: t.timer.a5 },
+    { q: t.timer.q6, a: t.timer.a6 },
+    { q: t.timer.q7, a: t.timer.a7 }
   ];
 
   return (
@@ -53,18 +53,18 @@ const TimerPage: React.FC = () => {
         
         <div className="text-center mb-6">
             <h1 className="text-2xl md:text-3xl font-black text-yellow-400 mb-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-                💬 الأسئلة الأكثر شيوعًا
+                {t.timer.faqTitle}
             </h1>
         </div>
 
-        <div className="space-y-3 mb-6 max-h-[400px] overflow-y-auto custom-scrollbar pr-2" dir="rtl">
+        <div className="space-y-3 mb-6 max-h-[400px] overflow-y-auto custom-scrollbar pr-2" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
             {faqs.map((item, idx) => (
                 <div key={idx} className="bg-zinc-900/80 p-4 rounded-xl border border-white/5">
                     <h3 className="text-yellow-400 font-bold text-sm mb-1 flex items-center gap-2">
                         <HelpCircle className="w-4 h-4" />
                         {item.q}
                     </h3>
-                    <p className="text-gray-300 text-xs leading-relaxed font-medium pr-6">
+                    <p className="text-gray-300 text-xs leading-relaxed font-medium px-1">
                         {item.a}
                     </p>
                 </div>
@@ -72,8 +72,8 @@ const TimerPage: React.FC = () => {
         </div>
         
         <div className="bg-gradient-to-r from-yellow-600/20 to-orange-600/20 p-4 rounded-xl border border-yellow-500/30 text-center mb-6">
-            <h2 className="text-white font-black text-lg">🔥 ابدأ الآن وارتقِ بحسابك على فيسبوك!</h2>
-            <p className="text-gray-300 text-xs mt-1">لا تفوّت فرصة تعزيز ظهور منشوراتك—جرّب Besoo Liker اليوم.</p>
+            <h2 className="text-white font-black text-lg">{t.timer.ctaTitle}</h2>
+            <p className="text-gray-300 text-xs mt-1">{t.timer.ctaDesc}</p>
         </div>
 
         {/* Timer & Button */}
@@ -83,7 +83,7 @@ const TimerPage: React.FC = () => {
                 <span className="text-green-500 font-black font-mono text-xl">
                     {canProceed ? '0' : timeLeft}
                 </span>
-                <span className="text-gray-500 text-xs font-bold uppercase">Seconds</span>
+                <span className="text-gray-500 text-xs font-bold uppercase">{t.faq.seconds || "Seconds"}</span>
             </div>
 
             <button 
@@ -93,8 +93,12 @@ const TimerPage: React.FC = () => {
                     canProceed ? 'bg-green-500 text-white hover:bg-green-400 hover:scale-[1.02] shadow-[0_0_20px_rgba(34,197,94,0.4)]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
                 }`}
             >
-                {canProceed ? "اضغط هنا للمتابعة" : "يرجى الانتظار..."}
-                {canProceed && <ArrowLeft className="w-6 h-6 stroke-[3px]" />}
+                {canProceed ? t.timer.buttonGet : t.faq.buttonWait}
+                {canProceed && (
+                    <>
+                        {lang === 'ar' ? <ArrowLeft className="w-6 h-6 stroke-[3px]" /> : <ArrowLeft className="w-6 h-6 stroke-[3px] rotate-180" />}
+                    </>
+                )}
             </button>
         </div>
 

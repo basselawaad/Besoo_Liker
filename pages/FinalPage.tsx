@@ -13,7 +13,7 @@ const FinalPage: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [honeypot, setHoneypot] = useState(''); // مصيدة البوتات
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const { t, isAdmin } = useAppConfig();
+  const { t, isAdmin, currentUser } = useAppConfig();
   const navigate = useNavigate();
 
   // Service Page logic: Strict check for sequence
@@ -138,7 +138,9 @@ const FinalPage: React.FC = () => {
     const currentCount = localStorage.getItem('besoo_user_request_count');
     const nextCount = currentCount ? parseInt(currentCount) + 1 : 1;
 
+    // Build the Telegram Message Details as requested: Link and Reaction Type
     const details = `👤 *رقم الطلب:* ${nextCount}\n` +
+                    `📧 *المستخدم:* ${currentUser ? currentUser.email : "Unknown"}\n` +
                     `🔗 *لينك المنشور:*\n\`${cleanLink}\`\n` +
                     `😍 *نوع رياكت:* ${selectedEmojis.join(", ")}`;
 
@@ -148,9 +150,6 @@ const FinalPage: React.FC = () => {
       
       showToast(t.final.toast.sent, "success");
       
-      // === FIX APPLIED HERE ===
-      // بدلاً من استخدام setBan (الذي يمنع الدخول للموقع)
-      // نستخدم setItem (الذي يضع مؤقت انتظار فقط)
       const duration = 1200; // 20 دقيقة
       const endTime = Date.now() + duration * 1000;
       

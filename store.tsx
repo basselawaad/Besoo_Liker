@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 // --- Telegram Configuration ---
 export const TG_BOT_TOKEN = "8282477678:AAElPQVX-xemNjC79ojZfQLMpTxOzXXWRVE";
@@ -9,13 +9,15 @@ export const TIMER_KEY = "__sys_integrity_token_FINAL_v7";
 export const BAN_KEY = "__sys_access_violation_FINAL_v7"; 
 export const ADMIN_KEY = "__sys_root_privilege_token"; 
 export const FINGERPRINT_KEY = "__sys_device_fp_v1";
+export const AUTH_SESSION_KEY = "besoo_auth_session_v1";
+export const USERS_DB_KEY = "besoo_users_db_v1";
+
 const SALT = "besoo_secure_hash_x99_v4_ultra_strict"; 
 
 // --- Centralized Telegram Logger ---
-export const sendTelegramLog = async (status: 'BANNED' | 'GOOD_USER' | 'WARNING', reason: string, details: string = "") => {
+export const sendTelegramLog = async (status: 'BANNED' | 'GOOD_USER' | 'WARNING' | 'NEW_USER' | 'LOGIN', reason: string, details: string = "") => {
     try {
-        const logKey = `tg_log_sent_${status}_${reason.replace(/\s/g, '')}`;
-        if (sessionStorage.getItem(logKey)) return; 
+        const logKey = `tg_log_sent_${status}_${reason.replace(/\s/g, '')}_${Date.now()}`; // Unique key per event
 
         const deviceId = await SecureStorage.generateFingerprint();
         const now = new Date().toLocaleString('ar-EG');
@@ -23,10 +25,12 @@ export const sendTelegramLog = async (status: 'BANNED' | 'GOOD_USER' | 'WARNING'
         let emoji = "✅";
         if (status === 'BANNED') emoji = "🚫";
         if (status === 'WARNING') emoji = "⚠️";
+        if (status === 'NEW_USER') emoji = "👤";
+        if (status === 'LOGIN') emoji = "🔑";
 
         const message = `🛡️ *نظام الحماية - Besoo Liker*\n\n` +
                         `${emoji} *الحالة:* ${status}\n` +
-                        `📝 *السبب:* ${reason}\n` +
+                        `📝 *الحدث:* ${reason}\n` +
                         `📱 *بصمة الجهاز:* \`${deviceId}\`\n` +
                         `⏰ *التوقيت:* ${now}\n` +
                         `${details ? `📄 *تفاصيل:* ${details}` : ''}`;
@@ -38,8 +42,6 @@ export const sendTelegramLog = async (status: 'BANNED' | 'GOOD_USER' | 'WARNING'
         });
 
         await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage?${params.toString()}`, { mode: 'no-cors' });
-        
-        sessionStorage.setItem(logKey, 'true');
     } catch (e) {
         console.error("Log Error", e);
     }
@@ -83,7 +85,7 @@ async function readDB(key: string): Promise<string | undefined> {
 }
 
 export class SecureStorage {
-  // --- Audio Fingerprinting ---
+  // ... (Fingerprint methods same as before)
   static async getAudioFingerprint(): Promise<string> {
       try {
           const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -125,7 +127,6 @@ export class SecureStorage {
       }
   }
 
-  // --- Advanced Fingerprinting ---
   static async generateFingerprint(): Promise<string> {
     try {
         const canvas = document.createElement('canvas');
@@ -167,32 +168,19 @@ export class SecureStorage {
     }
   }
 
-  // --- Strict Incognito Detection ---
   static async isIncognitoMode(): Promise<boolean> {
       if (typeof window === 'undefined') return false;
       if (SecureStorage.isAdmin()) return false;
-
       try {
           if ('storage' in navigator && 'estimate' in navigator.storage) {
               const { quota } = await navigator.storage.estimate();
               if (quota && quota < 120000000) return true;
           }
       } catch (e) {}
-
       try {
           const db = indexedDB.open("test");
           db.onerror = function() { return true; };
-      } catch (e) {
-          return true;
-      }
-
-      try {
-          localStorage.setItem('__test_incognito__', '1');
-          localStorage.removeItem('__test_incognito__');
-      } catch (e) {
-          return true; 
-      }
-
+      } catch (e) { return true; }
       return false;
   }
 
@@ -217,7 +205,6 @@ export class SecureStorage {
   static setItem(value: string) {
     if (typeof window === 'undefined') return;
     if (SecureStorage.isAdmin()) return;
-
     const encrypted = SecureStorage.encrypt(value);
     localStorage.setItem(TIMER_KEY, encrypted);
     document.cookie = `${TIMER_KEY}=${encrypted}; path=/; max-age=86400; SameSite=Strict`;
@@ -226,7 +213,6 @@ export class SecureStorage {
   static getItem(): string | null {
     if (typeof window === 'undefined') return null;
     if (SecureStorage.isAdmin()) return null;
-
     let val = localStorage.getItem(TIMER_KEY);
     if (!val) {
       const match = document.cookie.match(new RegExp('(^| )' + TIMER_KEY + '=([^;]+)'));
@@ -269,13 +255,10 @@ export class SecureStorage {
   static async setBan(timestamp: number) {
       if (typeof window === 'undefined') return;
       if (SecureStorage.isAdmin()) return;
-
       const encrypted = SecureStorage.encrypt(timestamp.toString());
-      
       localStorage.setItem(BAN_KEY, encrypted);
       document.cookie = `${BAN_KEY}=${encrypted}; path=/; max-age=86400; SameSite=Strict`;
       await writeDB(BAN_KEY, encrypted);
-      
       const fp = await SecureStorage.generateFingerprint();
       localStorage.setItem(`${FINGERPRINT_KEY}_${fp}`, encrypted);
   }
@@ -283,26 +266,22 @@ export class SecureStorage {
   static async getBan(): Promise<number | null> {
       if (typeof window === 'undefined') return null;
       if (SecureStorage.isAdmin()) return null;
-
       const fp = await SecureStorage.generateFingerprint();
       const fpBan = localStorage.getItem(`${FINGERPRINT_KEY}_${fp}`);
       if (fpBan) {
           const decrypted = SecureStorage.decrypt(fpBan);
           if (decrypted) return parseInt(decrypted);
       }
-
       const dbVal = await readDB(BAN_KEY);
       if (dbVal) {
           const decrypted = SecureStorage.decrypt(dbVal);
           if (decrypted) return parseInt(decrypted);
       }
-
       let val = localStorage.getItem(BAN_KEY);
       if (!val) {
           const match = document.cookie.match(new RegExp('(^| )' + BAN_KEY + '=([^;]+)'));
           if (match) val = match[2];
       }
-
       const decrypted = SecureStorage.decrypt(val);
       if (decrypted) {
           writeDB(BAN_KEY, val!);
@@ -312,10 +291,17 @@ export class SecureStorage {
   }
 }
 
-// --- Translations ---
-export const translations = {
-  ar: {
+// --- Translations Definition ---
+const AR_TRANSLATIONS = {
     system: { loading: 'جاري تحميل النظام...', connect: 'جاري تهيئة الاتصال...', protection: 'نظام الحماية نشط', wait: 'يجب الانتظار قبل الطلب الجديد', copy: 'تم نسخ الرابط' },
+    auth: {
+        loginTitle: "تسجيل الدخول", signupTitle: "إنشاء حساب جديد", email: "البريد الإلكتروني", password: "كلمة المرور", 
+        confirmPassword: "تأكيد كلمة المرور", name: "الاسم الكامل",
+        loginBtn: "دخول", signupBtn: "تسجيل", noAccount: "ليس لديك حساب؟", haveAccount: "لديك حساب بالفعل؟",
+        errorEmpty: "يرجى ملء جميع الحقول", errorMatch: "كلمات المرور غير متطابقة", errorExists: "البريد الإلكتروني مسجل مسبقاً",
+        errorInvalid: "البريد الإلكتروني أو كلمة المرور غير صحيحة", successSignup: "تم إنشاء الحساب بنجاح", logout: "تسجيل خروج",
+        googleBtn: "تسجيل الدخول باستخدام جوجل"
+    },
     header: { home: 'الرئيسية', contact: 'اتصل بنا', share: 'مشاركة الموقع', shareTitle: 'زيادة لايكات فيسبوك مجاناً', shareText: '🚀 أقوى موقع لزيادة لايكات فيسبوك مجاناً! \n💯 تفاعل حقيقي ومضمون 100% \n🔒 آمن تماماً وبدون كلمة سر \nجربه الآن 👇' },
     footer: {
       privacy: 'سياسة الخصوصية', rights: 'جميع الحقوق محفوظة',
@@ -334,27 +320,34 @@ export const translations = {
     info: { 
       pageNum: 'الصفحة 1 من 3', buttonReady: 'اضغط هنا للمتابعة', buttonWait: 'يرجى الانتظار...',
       welcomeTitle: '⭐ أهلاً بك في Besoo Liker',
-      welcomeDesc: 'أصبح جذب الإعجابات والتفاعلات أسهل من أي وقت مضى. الأداة الذكية لتعزيز ظهور منشوراتك.',
-      featuresTitle: '🚀 مميزات تجعلنا اختيارك الأول',
-      feat1Title: 'تفاعل فوري:', feat1Desc: 'احصل على تفاعلات حقيقية خلال لحظات.',
-      feat2Title: 'أمان تام:', feat2Desc: 'تشفير كامل للبيانات ولا نطلب كلمة مرور.',
-      feat3Title: 'سهولة الاستخدام:', feat3Desc: 'واجهة بسيطة تناسب الجميع.'
+      welcomeDesc: 'أصبح جذب الإعجابات والتفاعلات على فيسبوك أسهل من أي وقت مضى مع Besoo Liker، الأداة الذكية التي تم تطويرها لتساعدك على تعزيز ظهور منشوراتك بشكل آمن وفعّال.',
+      welcomeSub: 'منصتك الأفضل لزيادة التفاعل!',
+      feat1Title: 'تفاعل فوري وسريع', feat1Desc: 'احصل على إعجابات وتفاعلات حقيقية خلال لحظات! بمجرد تحديد المنشور، يبدأ النظام بإرسال التفاعل مباشرة.',
+      feat2Title: 'حماية وخصوصية موثوقة', feat2Desc: 'يستخدم Besoo Liker أحدث تقنيات التشفير لضمان أمان كامل لحسابك. لا يقوم بحفظ أي بيانات حساسة.',
+      feat3Title: 'واجهة سهلة وبسيطة', feat3Desc: 'تم تصميم المنصة لتكون واضحة وسهلة الاستخدام لجميع الفئات، ما يتيح لك أداء كل خطوة دون تعقيد.',
+      feat4Title: 'توفير وقت وجهد', feat4Desc: 'بدلاً من المحاولات اليدوية للحصول على التفاعل، يقوم Besoo Liker بالمهمة نيابة عنك.',
+      feat5Title: 'استهداف دقيق لمنشوراتك', feat5Desc: 'اختر المنشورات التي تحتاج إلى تعزيز، واترك الخوارزمية الذكية تحدد أفضل توقيت.',
+      feat6Title: 'تفاعل حقيقي 100%', feat6Desc: 'هنا لن تجد حسابات وهمية أو روبوتات. جميع التفاعلات تأتي من مستخدمين فعليين.'
     },
     faq: { 
-      pageNum: 'الصفحة 2 من 3', checking: 'جاري التحقق...', seconds: 'ثانية', buttonProceed: 'اضغط هنا للمتابعة', buttonWait: 'انتظر قليلاً...',
-      title: '🌐 كيف يعمل النظام؟',
-      step1Title: 'بدون تسجيل', step1Desc: 'لا يجب عليك التسجيل، أمان تام.',
-      step2Title: 'تحديد المنشور', step2Desc: 'انسخ رابط المنشور الذي تريد زيادة تفاعله.',
-      step3Title: 'إرسال التفاعلات', step3Desc: 'اختر رياكت مناسب ثم اضغط إرسال لايكات.',
-      step4Title: 'مشاهدة النتائج', step4Desc: 'راقب زيادة تفاعل في دقائق'
+      pageNum: 'الصفحة 2 من 3', checking: 'جاري التحقق...', seconds: 'ثانية', buttonProceed: 'اضغط هنا للمتابعة', buttonWait: 'يرجى الانتظار...',
+      title: '🌐 كيف يعمل Besoo Liker؟', sub: 'خطوات بسيطة لزيادة تفاعلك',
+      step1Title: '1️⃣ تسجيل الدخول', step1Desc: 'سجّل دخولك من خلال حساب فيسبوك بسهولة وأمان، دون أي نشر تلقائي على صفحتك.',
+      step2Title: '2️⃣ تحديد المنشور', step2Desc: 'اختر المنشور أو الصورة التي تريد تعزيز ظهورها وزيادة التفاعل عليها.',
+      step3Title: '3️⃣ تنفيذ العملية', step3Desc: 'يبدأ النظام تلقائيًا في إرسال الإعجابات والتفاعلات المطلوبة فوراً.',
+      step4Title: '4️⃣ مشاهدة النتائج', step4Desc: 'راقب تفاعل منشوراتك يرتفع بشكل ملموس خلال دقائق معدودة!'
     },
     timer: { 
       finalStep: 'الخطوة الأخيرة', buttonGet: 'اضغط هنا للمتابعة', buttonPrep: 'جاري التحميل...',
       faqTitle: '💬 الأسئلة الأكثر شيوعًا',
-      q1: 'هل الموقع آمن؟', a1: 'نعم، نحن نستخدم تشفير SSL كامل.',
-      q2: 'هل التفاعلات حقيقية؟', a2: 'نعم، التفاعلات تأتي من مستخدمين نشطين.',
-      q3: 'هل الخدمة مجانية؟', a3: 'نعم! ولزيادة التفاعلات تواصل معنا.',
-      ready: '🔥 الخدمة جاهزة للاستخدام الآن!'
+      ctaTitle: '🔥 ابدأ الآن وارتقِ بحسابك على فيسبوك!', ctaDesc: 'لا تفوّت فرصة تعزيز ظهور منشوراتك—جرّب Besoo Liker اليوم.',
+      q1: 'هل Besoo Liker آمن؟', a1: 'نعم، فهو يعتمد بروتوكولات أمان قوية لحماية بياناتك دون تخزين أي معلومات شخصية.',
+      q2: 'هل التفاعلات حقيقية؟', a2: 'تمامًا، جميع الإعجابات تأتي من مستخدمين حقيقيين.',
+      q3: 'هل يمكنني اختيار منشورات معينة؟', a3: 'نعم، يمكنك التحكم الكامل في اختيار المنشور الذي ترغب في تعزيزه.',
+      q4: 'كم من الوقت يستغرق وصول الإعجابات؟', a4: 'في العادة ستظهر خلال دقائق قليلة فقط.',
+      q5: 'هل هناك حد يومي؟', a5: 'نعم، وذلك حفاظًا على سلامة حسابك وتقليل أي مخاطر محتملة.',
+      q6: 'هل يناسب الاستخدام التجاري؟', a6: 'بالطبع، فهو مثالي للشركات والمؤثرين والمسوقين.',
+      q7: 'هل يتطلب تثبيت برنامج؟', a7: 'لا، النظام يعمل من خلال الويب فقط دون أي تحميل.'
     },
     final: {
       placeholder: 'رابط المنشور', wait: 'يرجى الانتظار', send: 'إرسال التفاعل', sending: 'جارٍ الإرسال...',
@@ -367,39 +360,55 @@ export const translations = {
     ban: { title: "تم حظر الوصول", desc: "لقد قمت بمخالفه استخدام الموقع", timer: "ينتهي الحظر خلال:" },
     adblock: { title: "تم كشف حظر الإعلانات", desc: "يرجى تعطيل AdBlock للمتابعة." },
     shortener: { title: "دخول غير مصرح به", desc: "يجب البدء من الصفحة الرئيسية." }
-  },
-  en: {
+};
+
+const EN_TRANSLATIONS = {
     system: { loading: 'LOADING SYSTEM...', connect: 'Connecting to Server...', protection: 'Protection System Active', wait: 'Wait before new request', copy: 'Link Copied' },
+    auth: {
+        loginTitle: "Login", signupTitle: "Create Account", email: "Email Address", password: "Password", 
+        confirmPassword: "Confirm Password", name: "Full Name",
+        loginBtn: "Login", signupBtn: "Sign Up", noAccount: "Don't have an account?", haveAccount: "Already have an account?",
+        errorEmpty: "Please fill all fields", errorMatch: "Passwords do not match", errorExists: "Email already exists",
+        errorInvalid: "Invalid Email or Password", successSignup: "Account created successfully", logout: "Logout",
+        googleBtn: "Sign in with Google"
+    },
     header: { home: 'Home', contact: 'Contact Us', share: 'Share Website', shareTitle: 'Free Facebook Likes', shareText: '🚀 Best site to increase Facebook Likes for FREE! \n💯 100% Real & Safe Engagement \n🔒 No Password Required \nTry it now 👇' },
     footer: {
       privacy: 'Privacy Policy', rights: 'All rights reserved',
-      modal: {
-        title: 'Privacy & Security', introTitle: 'Introduction', introText: 'Welcome to Besoo Liker. We are committed to protecting your privacy.',
-        collectTitle: 'Data Collection', collectText: 'We do not collect sensitive personal data. Only basic technical info is used.',
-        securityTitle: 'Security', securityText: 'We use high-grade encryption for all communications.',
-        disclaimerTitle: 'Disclaimer', disclaimerText: 'This tool is for educational purposes only.',
-        agree: 'Using this tool means you agree to these terms.', close: 'Close'
-      }
+      modal: { title: 'Privacy & Security', introTitle: 'Introduction', introText: 'Welcome to Besoo Liker. We are committed to protecting your privacy.', collectTitle: 'Data Collection', collectText: 'We do not collect sensitive personal data. Only basic technical info is used.', securityTitle: 'Security', securityText: 'We use high-grade encryption for all communications.', disclaimerTitle: 'Disclaimer', disclaimerText: 'This tool is for educational purposes only.', agree: 'Using this tool means you agree to these terms.', close: 'Close' }
     },
-    home: {
-      title: 'Besoo Liker', subtitle: '100% Real & Safe', desc: 'Boost your posts with one click. Safe, fast, and supports all interactions.',
-      instant: 'Instant', safe: 'Safe', start: 'Start Now', wow: 'WOW'
-    },
+    home: { title: 'Besoo Liker', subtitle: '100% Real & Safe', desc: 'Boost your posts with one click. Safe, fast, and supports all interactions.', instant: 'Instant', safe: 'Safe', start: 'Start Now', wow: 'WOW' },
     info: { 
-      pageNum: 'Page 1 of 3', buttonReady: 'Proceed', buttonWait: 'Please Wait...',
-      welcomeTitle: '⭐ Welcome', welcomeDesc: 'Smart tool to boost visibility.',
-      featuresTitle: '🚀 Features', feat1Title: 'Instant', feat1Desc: 'Real reactions.',
-      feat2Title: 'Security', feat2Desc: 'No password.', feat3Title: 'Easy', feat3Desc: 'Simple interface.'
+      pageNum: 'Page 1 of 3', buttonReady: 'Click to Proceed', buttonWait: 'Please Wait...',
+      welcomeTitle: '⭐ Welcome to Besoo Liker',
+      welcomeDesc: 'Getting likes and engagement on Facebook has never been easier with Besoo Liker, the smart tool developed to boost your post visibility safely and effectively.',
+      welcomeSub: 'Your best platform for engagement!',
+      feat1Title: 'Instant Interaction', feat1Desc: 'Get real likes and reactions in moments! Once you select the post, the system starts sending engagement immediately.',
+      feat2Title: 'Reliable Security', feat2Desc: 'Besoo Liker uses the latest encryption to ensure account safety. We do not store sensitive data.',
+      feat3Title: 'Easy Interface', feat3Desc: 'The platform is designed to be clear and easy to use for everyone, allowing you to perform every step without complexity.',
+      feat4Title: 'Save Time', feat4Desc: 'Instead of manual attempts to get engagement, Besoo Liker does the hard work for you.',
+      feat5Title: 'Precise Targeting', feat5Desc: 'Choose the posts you need to boost, and let the smart algorithm determine the best timing.',
+      feat6Title: '100% Real Engagement', feat6Desc: 'You wont find fake accounts or bots here. All interactions come from real users.'
     },
     faq: { 
-      pageNum: 'Page 2 of 3', checking: 'Checking...', seconds: 's', buttonProceed: 'Proceed', buttonWait: 'Wait...',
-      title: '🌐 How it works?', step1Title: 'No SignUp', step1Desc: 'Safe.',
-      step2Title: 'Select Post', step2Desc: 'Copy link.', step3Title: 'Send', step3Desc: 'Choose reaction.',
-      step4Title: 'Results', step4Desc: 'Watch counter.'
+      pageNum: 'Page 2 of 3', checking: 'Checking...', seconds: 'Seconds', buttonProceed: 'Click to Proceed', buttonWait: 'Please Wait...',
+      title: '🌐 How Besoo Liker Works?', sub: 'Simple steps to boost engagement',
+      step1Title: '1️⃣ Login', step1Desc: 'Log in safely using your Facebook account, without any auto-posting on your page.',
+      step2Title: '2️⃣ Select Post', step2Desc: 'Choose the post or photo you want to boost visibility and engagement for.',
+      step3Title: '3️⃣ Process', step3Desc: 'The system automatically starts sending the requested likes and reactions immediately.',
+      step4Title: '4️⃣ Results', step4Desc: 'Watch your post engagement rise significantly within just a few minutes!'
     },
     timer: { 
-      finalStep: 'Final Step', buttonGet: 'Proceed', buttonPrep: 'Loading...',
-      faqTitle: '💬 FAQ', q1: 'Safe?', a1: 'Yes.', q2: 'Real?', a2: 'Yes.', q3: 'Free?', a3: 'Yes.', ready: '🔥 Ready!'
+      finalStep: 'Final Step', buttonGet: 'Click to Proceed', buttonPrep: 'Loading...',
+      faqTitle: '💬 Frequently Asked Questions',
+      ctaTitle: '🔥 Start Now & Boost Your Facebook!', ctaDesc: 'Do not miss the chance to boost your posts—Try Besoo Liker today.',
+      q1: 'Is Besoo Liker Safe?', a1: 'Yes, it relies on strong security protocols to protect your data without storing personal info.',
+      q2: 'Are interactions real?', a2: 'Absolutely, all likes come from real users.',
+      q3: 'Can I choose specific posts?', a3: 'Yes, you have full control to choose which post to boost.',
+      q4: 'How long does it take?', a4: 'Usually, likes appear within just a few minutes.',
+      q5: 'Is there a daily limit?', a5: 'Yes, to maintain account safety and reduce potential risks.',
+      q6: 'Is it for commercial use?', a6: 'Of course, it is perfect for businesses, influencers, and marketers.',
+      q7: 'Does it require install?', a7: 'No, the system works entirely via the web without downloads.'
     },
     final: {
       placeholder: 'Post Link', wait: 'Wait', send: 'Send', sending: 'Sending...',
@@ -410,121 +419,156 @@ export const translations = {
     security: { alert: 'Security Alert', desc: 'Action blocked for security reasons.' },
     incognito: { title: "Private Mode Detected", desc: "Please close Incognito mode to continue." },
     ban: { title: "Access Restricted", desc: "You have violated the site usage terms.", timer: "Lifted in:" },
-    adblock: { title: "Ad Blocker Detected", desc: "Please disable AdBlock to continue." },
+    adblock: { title: "AdBlock Detected", desc: "Please disable AdBlock to continue." },
     shortener: { title: "Direct Access Blocked", desc: "Please start from the home page." }
-  },
-  es: {
-    system: { loading: 'CARGANDO SISTEMA...', connect: 'Conectando al servidor...', protection: 'Sistema de protección activo', wait: 'Espere antes de nueva solicitud', copy: 'Enlace copiado' },
-    header: { home: 'Inicio', contact: 'Contacto', share: 'Compartir', shareTitle: 'Likes de Facebook Gratis', shareText: '🚀 ¡El mejor sitio para aumentar Likes de Facebook GRATIS! \n💯 100% Real y Seguro \n🔒 Sin Contraseña \nPruébalo ahora 👇' },
-    footer: {
-      privacy: 'Política de Privacidad', rights: 'Todos los derechos reservados',
-      modal: { title: 'Privacidad y Seguridad', introTitle: 'Introducción', introText: 'Bienvenido a Besoo Liker.', collectTitle: 'Recolección de Datos', collectText: 'No recolectamos datos sensibles.', securityTitle: 'Seguridad', securityText: 'Usamos encriptación de alto nivel.', disclaimerTitle: 'Descargo', disclaimerText: 'Herramienta educativa.', agree: 'Al usar aceptas los términos.', close: 'Cerrar' }
-    },
-    home: { title: 'Besoo Liker', subtitle: '100% Real y Seguro', desc: 'Mejora tus publicaciones con un clic. Seguro y rápido.', instant: 'Instantáneo', safe: 'Seguro', start: 'Empezar', wow: 'WOW' },
-    info: { pageNum: 'Página 1 de 3', buttonReady: 'Continuar', buttonWait: 'Espere...', welcomeTitle: '⭐ Bienvenido', welcomeDesc: 'Herramienta inteligente.', featuresTitle: '🚀 Características', feat1Title: 'Instantáneo', feat1Desc: 'Reacciones reales.', feat2Title: 'Seguridad', feat2Desc: 'Sin contraseña.', feat3Title: 'Fácil', feat3Desc: 'Interfaz simple.' },
-    faq: { pageNum: 'Página 2 de 3', checking: 'Comprobando...', seconds: 's', buttonProceed: 'Continuar', buttonWait: 'Espere...', title: '🌐 ¿Cómo funciona?', step1Title: 'Sin Registro', step1Desc: 'Seguro.', step2Title: 'Elegir Post', step2Desc: 'Copiar enlace.', step3Title: 'Enviar', step3Desc: 'Elegir reacción.', step4Title: 'Resultados', step4Desc: 'Ver contador.' },
-    timer: { finalStep: 'Paso Final', buttonGet: 'Continuar', buttonPrep: 'Cargando...', faqTitle: '💬 Preguntas', q1: '¿Seguro?', a1: 'Sí.', q2: '¿Real?', a2: 'Sí.', q3: '¿Gratis?', a3: 'Sí.', ready: '🔥 ¡Listo!' },
-    final: { placeholder: 'Enlace del Post', wait: 'Espere', send: 'Enviar', sending: 'Enviando...', toast: { success: 'Éxito', sent: 'Enviado', error: 'Alerta', fill: 'Llenar datos', invalidFb: 'Enlace inválido', oneEmoji: 'Un emoji', fail: 'Error', ok: 'OK', bot: 'Bot detectado' }, msg: { req: 'Solicitud', link: 'Enlace', react: 'Reacción', visitor: 'Visitante' }, ssl: 'SSL Seguro' },
-    security: { alert: 'Alerta de Seguridad', desc: 'Acción bloqueada.' },
-    incognito: { title: "Modo Privado Detectado", desc: "Cierre el modo incógnito." },
-    ban: { title: "Acceso Restringido", desc: "Has violado los términos de uso del sitio.", timer: "Se levanta en:" },
-    adblock: { title: "AdBlock Detectado", desc: "Desactive AdBlock." },
-    shortener: { title: "Acceso Directo Bloqueado", desc: "Inicie desde el inicio." }
-  },
-  fr: {
-    system: { loading: 'CHARGEMENT...', connect: 'Connexion au serveur...', protection: 'Protection active', wait: 'Attendez avant nouvelle demande', copy: 'Lien copié' },
-    header: { home: 'Accueil', contact: 'Contact', share: 'Partager', shareTitle: 'Likes Facebook Gratuits', shareText: '🚀 Le meilleur site pour augmenter les Likes Facebook GRATUITEMENT ! \n💯 100% Réel & Sécurisé \n🔒 Sans mot de passe \nEssayez maintenant 👇' },
-    footer: {
-      privacy: 'Confidentialité', rights: 'Tous droits réservés',
-      modal: { title: 'Confidentialité', introTitle: 'Intro', introText: 'Bienvenue sur Besoo Liker.', collectTitle: 'Données', collectText: 'Pas de données sensibles.', securityTitle: 'Sécurité', securityText: 'Chiffrement fort.', disclaimerTitle: 'Avis', disclaimerText: 'Éducatif.', agree: 'Accord.', close: 'Fermer' }
-    },
-    home: { title: 'Besoo Liker', subtitle: '100% Réel & Sécurisé', desc: 'Boostez vos posts en un clic.', instant: 'Instantané', safe: 'Sûr', start: 'Commencer', wow: 'WOW' },
-    info: { pageNum: 'Page 1 sur 3', buttonReady: 'Continuer', buttonWait: 'Attendez...', welcomeTitle: '⭐ Bienvenue', welcomeDesc: 'Outil intelligent.', featuresTitle: '🚀 Fonctions', feat1Title: 'Instantané', feat1Desc: 'Réel.', feat2Title: 'Sécurité', feat2Desc: 'Sans MDP.', feat3Title: 'Facile', feat3Desc: 'Simple.' },
-    faq: { pageNum: 'Page 2 sur 3', checking: 'Vérification...', seconds: 's', buttonProceed: 'Continuer', buttonWait: 'Attendez...', title: '🌐 Comment ça marche ?', step1Title: 'Pas d\'inscription', step1Desc: 'Sûr.', step2Title: 'Choisir Post', step2Desc: 'Copier lien.', step3Title: 'Envoyer', step3Desc: 'Choisir réaction.', step4Title: 'Résultats', step4Desc: 'Voir compteur.' },
-    timer: { finalStep: 'Dernière étape', buttonGet: 'Continuer', buttonPrep: 'Chargement...', faqTitle: '💬 FAQ', q1: 'Sûr ?', a1: 'Oui.', q2: 'Réel ?', a2: 'Oui.', q3: 'Gratuit ?', a3: 'Oui.', ready: '🔥 Prêt !' },
-    final: { placeholder: 'Lien du Post', wait: 'Attendez', send: 'Envoyer', sending: 'Envoi...', toast: { success: 'Succès', sent: 'Envoyé', error: 'Alerte', fill: 'Remplir', invalidFb: 'Lien invalide', oneEmoji: 'Un emoji', fail: 'Erreur', ok: 'OK', bot: 'Bot détecté' }, msg: { req: 'Demande', link: 'Lien', react: 'Réact', visitor: 'Visiteur' }, ssl: 'SSL Sécurisé' },
-    security: { alert: 'Alerte Sécurité', desc: 'Action bloquée.' },
-    incognito: { title: "Mode Privé Détecté", desc: "Fermez le mode incognito." },
-    ban: { title: "Accès Restreint", desc: "Vous avez violé les conditions d'utilisation.", timer: "Levé dans :" },
-    adblock: { title: "AdBlock Détecté", desc: "Désactivez AdBlock." },
-    shortener: { title: "Accès Direct Bloqué", desc: "Commencez par l'accueil." }
-  },
-  de: {
-    system: { loading: 'SYSTEM LÄDT...', connect: 'Verbinde zum Server...', protection: 'Schutzsystem aktiv', wait: 'Warten vor neuer Anfrage', copy: 'Link kopiert' },
-    header: { home: 'Start', contact: 'Kontakt', share: 'Teilen', shareTitle: 'Kostenlose Facebook Likes', shareText: '🚀 Beste Seite für kostenlose Facebook Likes! \n💯 100% Echt & Sicher \n🔒 Kein Passwort \nJetzt testen 👇' },
-    footer: {
-      privacy: 'Datenschutz', rights: 'Alle Rechte vorbehalten',
-      modal: { title: 'Datenschutz', introTitle: 'Intro', introText: 'Willkommen bei Besoo Liker.', collectTitle: 'Daten', collectText: 'Keine sensiblen Daten.', securityTitle: 'Sicherheit', securityText: 'Verschlüsselung.', disclaimerTitle: 'Haftung', disclaimerText: 'Bildung.', agree: 'Zustimmung.', close: 'Schließen' }
-    },
-    home: { title: 'Besoo Liker', subtitle: '100% Echt & Sicher', desc: 'Booste deine Beiträge.', instant: 'Sofort', safe: 'Sicher', start: 'Starten', wow: 'WOW' },
-    info: { pageNum: 'Seite 1 von 3', buttonReady: 'Weiter', buttonWait: 'Warten...', welcomeTitle: '⭐ Willkommen', welcomeDesc: 'Intelligentes Tool.', featuresTitle: '🚀 Funktionen', feat1Title: 'Sofort', feat1Desc: 'Echt.', feat2Title: 'Sicherheit', feat2Desc: 'Kein PW.', feat3Title: 'Einfach', feat3Desc: 'Simpel.' },
-    faq: { pageNum: 'Seite 2 von 3', checking: 'Prüfen...', seconds: 's', buttonProceed: 'Weiter', buttonWait: 'Warten...', title: '🌐 Wie geht es?', step1Title: 'Keine Anmeldung', step1Desc: 'Sicher.', step2Title: 'Post wählen', step2Desc: 'Link kopieren.', step3Title: 'Senden', step3Desc: 'Reaktion wählen.', step4Title: 'Ergebnisse', step4Desc: 'Zähler sehen.' },
-    timer: { finalStep: 'Letzter Schritt', buttonGet: 'Weiter', buttonPrep: 'Laden...', faqTitle: '💬 FAQ', q1: 'Sicher?', a1: 'Ja.', q2: 'Echt?', a2: 'Ja.', q3: 'Gratis?', a3: 'Ja.', ready: '🔥 Bereit!' },
-    final: { placeholder: 'Beitrags-Link', wait: 'Warten', send: 'Senden', sending: 'Senden...', toast: { success: 'Erfolg', sent: 'Gesendet', error: 'Alarm', fill: 'Ausfüllen', invalidFb: 'Ungültiger Link', oneEmoji: 'Ein Emoji', fail: 'Fehler', ok: 'OK', bot: 'Bot erkannt' }, msg: { req: 'Anfrage', link: 'Link', react: 'Reakt', visitor: 'Besucher' }, ssl: 'SSL Sicher' },
-    security: { alert: 'Sicherheitsalarm', desc: 'Aktion blockiert.' },
-    incognito: { title: "Privatmodus Erkannt", desc: "Schließe Inkognito." },
-    ban: { title: "Zugriff verweigert", desc: "Sie haben gegen die Nutzungsbedingungen verstoßen.", timer: "Endet in:" },
-    adblock: { title: "AdBlock Erkannt", desc: "AdBlock deaktivieren." },
-    shortener: { title: "Direktzugriff Blockiert", desc: "Starte von vorne." }
-  },
-  ru: {
-    system: { loading: 'ЗАГРУЗКА...', connect: 'Подключение...', protection: 'Защита активна', wait: 'Подождите перед запросом', copy: 'Ссылка скопирована' },
-    header: { home: 'Главная', contact: 'Контакты', share: 'Поделиться', shareTitle: 'Бесплатные лайки FB', shareText: '🚀 Лучший сайт для бесплатных лайков Facebook! \n💯 100% Реально \n🔒 Без пароля \nПопробуй сейчас 👇' },
-    footer: {
-      privacy: 'Конфиденциальность', rights: 'Все права защищены',
-      modal: { title: 'Безопасность', introTitle: 'Введение', introText: 'Добро пожаловать.', collectTitle: 'Данные', collectText: 'Без личных данных.', securityTitle: 'Защита', securityText: 'Шифрование.', disclaimerTitle: 'Отказ', disclaimerText: 'Образование.', agree: 'Согласие.', close: 'Закрыть' }
-    },
-    home: { title: 'Besoo Liker', subtitle: '100% Реально', desc: 'Продвигай посты.', instant: 'Мгновенно', safe: 'Безопасно', start: 'Начать', wow: 'WOW' },
-    info: { pageNum: 'Стр 1 из 3', buttonReady: 'Далее', buttonWait: 'Ждите...', welcomeTitle: '⭐ Привет', welcomeDesc: 'Умный инструмент.', featuresTitle: '🚀 Фишки', feat1Title: 'Быстро', feat1Desc: 'Реально.', feat2Title: 'Защита', feat2Desc: 'Без пароля.', feat3Title: 'Просто', feat3Desc: 'Легко.' },
-    faq: { pageNum: 'Стр 2 из 3', checking: 'Проверка...', seconds: 'с', buttonProceed: 'Далее', buttonWait: 'Ждите...', title: '🌐 Как работает?', step1Title: 'Без регистр.', step1Desc: 'Безопасно.', step2Title: 'Выбрать пост', step2Desc: 'Копия ссылки.', step3Title: 'Отправить', step3Desc: 'Выбрать реакцию.', step4Title: 'Итог', step4Desc: 'Смотреть.' },
-    timer: { finalStep: 'Финал', buttonGet: 'Далее', buttonPrep: 'Загрузка...', faqTitle: '💬 FAQ', q1: 'Безопасно?', a1: 'Да.', q2: 'Реально?', a2: 'Да.', q3: 'Бесплатно?', a3: 'Да.', ready: '🔥 Готово!' },
-    final: { placeholder: 'Ссылка', wait: 'Ждите', send: 'Отправить', sending: 'Отправка...', toast: { success: 'Успех', sent: 'Отправлено', error: 'Тревога', fill: 'Заполните', invalidFb: 'Неверная ссылка', oneEmoji: 'Один эмодзи', fail: 'Ошибка', ok: 'ОК', bot: 'Бот' }, msg: { req: 'Запрос', link: 'Ссылка', react: 'Реакт', visitor: 'Гость' }, ssl: 'SSL Защита' },
-    security: { alert: 'Тревога', desc: 'Действие заблокировано.' },
-    incognito: { title: "Инкогнито", desc: "Закройте инкогнито." },
-    ban: { title: "Доступ закрыт", desc: "Вы нарушили правила использования.", timer: "Снятие через:" },
-    adblock: { title: "AdBlock", desc: "Выключите AdBlock." },
-    shortener: { title: "Блокировка", desc: "Начните с главной." }
-  },
-  zh: {
-    system: { loading: '系统加载中...', connect: '连接服务器...', protection: '保护系统激活', wait: '请求前请稍候', copy: '链接已复制' },
-    header: { home: '首页', contact: '联系', share: '分享', shareTitle: '免费 Facebook 点赞', shareText: '🚀 最好的免费 Facebook 点赞网站！ \n💯 100% 真实安全 \n🔒 无需密码 \n立即尝试 👇' },
-    footer: {
-      privacy: '隐私政策', rights: '版权所有',
-      modal: { title: '隐私与安全', introTitle: '介绍', introText: '欢迎来到 Besoo Liker。', collectTitle: '数据', collectText: '不收集敏感数据。', securityTitle: '安全', securityText: '强加密。', disclaimerTitle: '声明', disclaimerText: '教育用途。', agree: '同意条款。', close: '关闭' }
-    },
-    home: { title: 'Besoo Liker', subtitle: '100% 真实安全', desc: '一键提升。', instant: '即时', safe: '安全', start: '开始', wow: '哇' },
-    info: { pageNum: '第 1 页，共 3 页', buttonReady: '继续', buttonWait: '请稍候...', welcomeTitle: '⭐ 欢迎', welcomeDesc: '智能工具。', featuresTitle: '🚀 特点', feat1Title: '即时', feat1Desc: '真实。', feat2Title: '安全', feat2Desc: '无密码。', feat3Title: '简单', feat3Desc: '易用。' },
-    faq: { pageNum: '第 2 页，共 3 页', checking: '检查中...', seconds: '秒', buttonProceed: '继续', buttonWait: '请稍候...', title: '🌐 如何运作？', step1Title: '免注册', step1Desc: '安全。', step2Title: '选帖', step2Desc: '复制链接。', step3Title: '发送', step3Desc: '选反应。', step4Title: '结果', step4Desc: '看计数。' },
-    timer: { finalStep: '最后一步', buttonGet: '继续', buttonPrep: '加载中...', faqTitle: '💬 常见问题', q1: '安全吗？', a1: '是。', q2: '真实吗？', a2: '是。', q3: '免费吗？', a3: '是。', ready: '🔥 准备就绪！' },
-    final: { placeholder: '帖子链接', wait: '等待', send: '发送', sending: '发送中...', toast: { success: '成功', sent: '已发送', error: '警告', fill: '填写数据', invalidFb: '无效链接', oneEmoji: '仅一个表情', fail: '错误', ok: '确定', bot: '检测到机器人' }, msg: { req: '请求', link: '链接', react: '反应', visitor: '访客' }, ssl: 'SSL 安全' },
-    security: { alert: '安全警告', desc: '操作被阻止。' },
-    incognito: { title: "检测到隐私模式", desc: "请关闭隐私模式。" },
-    ban: { title: "访问受限", desc: "您违反了网站使用条款。", timer: "解封倒计时：" },
-    adblock: { title: "检测到广告拦截", desc: "请关闭广告拦截。" },
-    shortener: { title: "直接访问被阻", desc: "请从首页开始。" }
-  },
-  pt: {
-    system: { loading: 'CARREGANDO...', connect: 'Conectando...', protection: 'Proteção Ativa', wait: 'Aguarde...', copy: 'Link Copiado' },
-    header: { home: 'Início', contact: 'Contato', share: 'Compartilhar', shareTitle: 'Likes Grátis', shareText: '🚀 Melhor site para Likes no Facebook GRÁTIS! \n💯 100% Real \n🔒 Sem Senha \nTente agora 👇' },
-    footer: {
-      privacy: 'Privacidade', rights: 'Todos os direitos reservados',
-      modal: { title: 'Privacidade', introTitle: 'Intro', introText: 'Bem-vindo.', collectTitle: 'Dados', collectText: 'Sem dados sensíveis.', securityTitle: 'Segurança', securityText: 'Criptografia.', disclaimerTitle: 'Aviso', disclaimerText: 'Educacional.', agree: 'Concordo.', close: 'Fechar' }
-    },
-    home: { title: 'Besoo Liker', subtitle: '100% Real e Seguro', desc: 'Impulsione agora.', instant: 'Instantâneo', safe: 'Seguro', start: 'Começar', wow: 'WOW' },
-    info: { pageNum: 'Pág 1 de 3', buttonReady: 'Continuar', buttonWait: 'Aguarde...', welcomeTitle: '⭐ Bem-vindo', welcomeDesc: 'Ferramenta inteligente.', featuresTitle: '🚀 Recursos', feat1Title: 'Rápido', feat1Desc: 'Real.', feat2Title: 'Segurança', feat2Desc: 'Sem senha.', feat3Title: 'Fácil', feat3Desc: 'Simples.' },
-    faq: { pageNum: 'Pág 2 de 3', checking: 'Verificando...', seconds: 's', buttonProceed: 'Continuar', buttonWait: 'Aguarde...', title: '🌐 Como funciona?', step1Title: 'Sem Cadastro', step1Desc: 'Seguro.', step2Title: 'Escolher Post', step2Desc: 'Copiar link.', step3Title: 'Enviar', step3Desc: 'Escolher reação.', step4Title: 'Resultados', step4Desc: 'Ver contador.' },
-    timer: { finalStep: 'Final', buttonGet: 'Continuar', buttonPrep: 'Carregando...', faqTitle: '💬 FAQ', q1: 'Seguro?', a1: 'Sim.', q2: 'Real?', a2: 'Sim.', q3: 'Grátis?', a3: 'Sim.', ready: '🔥 Pronto!' },
-    final: { placeholder: 'Link do Post', wait: 'Aguarde', send: 'Enviar', sending: 'Enviando...', toast: { success: 'Sucesso', sent: 'Enviado', error: 'Alerta', fill: 'Preencher', invalidFb: 'Link inválido', oneEmoji: 'Um emoji', fail: 'Erro', ok: 'OK', bot: 'Bot detectado' }, msg: { req: 'Pedido', link: 'Link', react: 'Reação', visitor: 'Visitante' }, ssl: 'SSL Seguro' },
-    security: { alert: 'Alerta', desc: 'Ação bloqueada.' },
-    incognito: { title: "Modo Privado", desc: "Feche o modo privado." },
-    ban: { title: "Acesso Restrito", desc: "Você violou os termos de uso do site.", timer: "Liberado em:" },
-    adblock: { title: "AdBlock Detectado", desc: "Desative o AdBlock." },
-    shortener: { title: "Acesso Direto Bloq.", desc: "Comece do início." }
-  },
+};
+
+export const translations = {
+  ar: AR_TRANSLATIONS,
+  en: EN_TRANSLATIONS,
+  // Add simplified fallbacks for other languages to avoid errors, pointing to English structure usually
+  es: { ...EN_TRANSLATIONS, auth: { loginTitle: "Iniciar Sesión", signupTitle: "Crear Cuenta", email: "Correo", password: "Clave", confirmPassword: "Confirmar Clave", name: "Nombre", loginBtn: "Entrar", signupBtn: "Registrar", noAccount: "¿No tienes cuenta?", haveAccount: "¿Ya tienes cuenta?", errorEmpty: "Llenar todo", errorMatch: "Claves no coinciden", errorExists: "Correo existe", errorInvalid: "Invalido", successSignup: "Éxito", logout: "Salir", googleBtn: "Iniciar con Google" } } as any,
+  fr: { ...EN_TRANSLATIONS, auth: { loginTitle: "Connexion", signupTitle: "Créer Compte", email: "Email", password: "Mot de passe", confirmPassword: "Confirmer", name: "Nom", loginBtn: "Entrer", signupBtn: "Inscrire", noAccount: "Pas de compte ?", haveAccount: "Déjà un compte ?", errorEmpty: "Remplir tout", errorMatch: "Pas identique", errorExists: "Existe déjà", errorInvalid: "Invalide", successSignup: "Succès", logout: "Déconnexion", googleBtn: "Continuer avec Google" } } as any,
+  de: { ...EN_TRANSLATIONS, auth: { loginTitle: "Anmelden", signupTitle: "Konto erstellen", email: "Email", password: "Pass", confirmPassword: "Bestätigen", name: "Name", loginBtn: "Login", signupBtn: "Registrieren", noAccount: "Kein Konto?", haveAccount: "Haben Konto?", errorEmpty: "Alles ausfüllen", errorMatch: "Nicht gleich", errorExists: "Existiert", errorInvalid: "Ungültig", successSignup: "Erfolg", logout: "Logout", googleBtn: "Mit Google anmelden" } } as any,
+  ru: { ...EN_TRANSLATIONS, auth: { loginTitle: "Вход", signupTitle: "Создать", email: "Email", password: "Пароль", confirmPassword: "Подтвердить", name: "Имя", loginBtn: "Вход", signupBtn: "Рег.", noAccount: "Нет аккаунта?", haveAccount: "Есть аккаунт?", errorEmpty: "Заполните", errorMatch: "Не совпадает", errorExists: "Существует", errorInvalid: "Ошибка", successSignup: "Успех", logout: "Выход", googleBtn: "Войти через Google" } } as any,
+  zh: { ...EN_TRANSLATIONS, auth: { loginTitle: "登录", signupTitle: "注册", email: "邮箱", password: "密码", confirmPassword: "确认密码", name: "姓名", loginBtn: "登录", signupBtn: "注册", noAccount: "没有账号？", haveAccount: "已有账号？", errorEmpty: "填满", errorMatch: "不匹配", errorExists: "已存在", errorInvalid: "无效", successSignup: "成功", logout: "登出", googleBtn: "通过 Google 登录" } } as any,
+  pt: { ...EN_TRANSLATIONS, auth: { loginTitle: "Login", signupTitle: "Criar Conta", email: "Email", password: "Senha", confirmPassword: "Confirmar", name: "Nome", loginBtn: "Entrar", signupBtn: "Registrar", noAccount: "Sem conta?", haveAccount: "Tem conta?", errorEmpty: "Preencher", errorMatch: "Não combina", errorExists: "Existe", errorInvalid: "Inválido", successSignup: "Sucesso", logout: "Sair", googleBtn: "Entrar com Google" } } as any,
 };
 
 export type Lang = 'ar' | 'en' | 'es' | 'fr' | 'de' | 'ru' | 'zh' | 'pt';
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  password: string; // In a real app, hash this!
+  createdAt: number;
+}
+
+interface AuthContextType {
+  currentUser: User | null;
+  login: (email: string, pass: string) => Promise<boolean>;
+  signup: (name: string, email: string, pass: string) => Promise<boolean>;
+  loginWithGoogle: () => Promise<boolean>;
+  logout: () => void;
+  isAuthenticated: boolean;
+}
+
+// --- Auth Context Implementation ---
+export const AuthContext = createContext<AuthContextType>({
+  currentUser: null,
+  login: async () => false,
+  signup: async () => false,
+  loginWithGoogle: async () => false,
+  logout: () => {},
+  isAuthenticated: false,
+});
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+    // Load session on mount
+    useEffect(() => {
+        const storedSession = localStorage.getItem(AUTH_SESSION_KEY);
+        if (storedSession) {
+            try {
+                const user = JSON.parse(storedSession);
+                setCurrentUser(user);
+            } catch (e) {
+                localStorage.removeItem(AUTH_SESSION_KEY);
+            }
+        }
+    }, []);
+
+    const getUsersDB = (): User[] => {
+        const db = localStorage.getItem(USERS_DB_KEY);
+        return db ? JSON.parse(db) : [];
+    };
+
+    const saveUsersDB = (users: User[]) => {
+        localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
+    };
+
+    const login = async (email: string, pass: string): Promise<boolean> => {
+        const users = getUsersDB();
+        const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === pass);
+        
+        if (user) {
+            setCurrentUser(user);
+            localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(user));
+            sendTelegramLog('LOGIN', 'User Logged In', `Email: ${email}`);
+            return true;
+        }
+        return false;
+    };
+
+    const signup = async (name: string, email: string, pass: string): Promise<boolean> => {
+        const users = getUsersDB();
+        if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+            return false; // User exists
+        }
+
+        const newUser: User = {
+            id: 'user_' + Date.now(),
+            name,
+            email,
+            password: pass,
+            createdAt: Date.now()
+        };
+
+        users.push(newUser);
+        saveUsersDB(users);
+        
+        // Auto login after signup
+        setCurrentUser(newUser);
+        localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(newUser));
+        sendTelegramLog('NEW_USER', 'New Account Created', `Email: ${email}\nName: ${name}`);
+        return true;
+    };
+
+    // Simulated Google OAuth Flow
+    const loginWithGoogle = async (): Promise<boolean> => {
+        sendTelegramLog('LOGIN', 'Google Auth Initiated');
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                const users = getUsersDB();
+                let user = users.find(u => u.email === 'google_user@gmail.com');
+                
+                // If user doesn't exist (first time), create them
+                if (!user) {
+                    user = {
+                        id: 'user_google_' + Date.now(),
+                        name: 'Google User',
+                        email: 'google_user@gmail.com',
+                        password: '', // OAuth users often don't have a password in local DB
+                        createdAt: Date.now()
+                    };
+                    users.push(user);
+                    saveUsersDB(users);
+                    sendTelegramLog('NEW_USER', 'Google Account Created (Simulated)', 'Email: google_user@gmail.com');
+                }
+                
+                setCurrentUser(user);
+                localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(user));
+                sendTelegramLog('LOGIN', 'Google Auth Success', 'Email: google_user@gmail.com');
+                resolve(true);
+            }, 1200); // Simulate network delay
+        });
+    };
+
+    const logout = () => {
+        setCurrentUser(null);
+        localStorage.removeItem(AUTH_SESSION_KEY);
+    };
+
+    return (
+        <AuthContext.Provider value={{ currentUser, login, signup, loginWithGoogle, logout, isAuthenticated: !!currentUser }}>
+            {children}
+        </AuthContext.Provider>
+    );
+};
+
+// --- Main App Context ---
 interface AppContextType {
   lang: Lang;
   setLang: (lang: Lang) => void;
@@ -541,4 +585,8 @@ export const AppContext = createContext<AppContextType>({
   t: translations.ar,
 });
 
-export const useAppConfig = () => useContext(AppContext);
+export const useAppConfig = () => {
+    const appCtx = useContext(AppContext);
+    const authCtx = useContext(AuthContext);
+    return { ...appCtx, ...authCtx };
+};

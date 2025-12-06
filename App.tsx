@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense } from 'react';
-import { HashRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, EyeOff, ShieldAlert, Ban, MonitorX, Link2Off, Clock, Terminal, Code2, Loader2, Lock } from 'lucide-react';
 
@@ -13,17 +13,19 @@ const InfoPage = React.lazy(() => import('./pages/InfoPage'));
 const FAQPage = React.lazy(() => import('./pages/FAQPage'));
 const TimerPage = React.lazy(() => import('./pages/TimerPage'));
 const FinalPage = React.lazy(() => import('./pages/FinalPage'));
+const LoginPage = React.lazy(() => import('./pages/LoginPage'));
+const SignupPage = React.lazy(() => import('./pages/SignupPage'));
 
 // Import shared logic from store to prevent circular dependencies
-import { SecureStorage, translations, AppContext, useAppConfig, Lang, BAN_KEY, sendTelegramLog } from './store';
+import { SecureStorage, translations, AppContext, AuthProvider, useAppConfig, Lang, BAN_KEY, sendTelegramLog } from './store';
 
 // --- Loading Spinner Component ---
 const PageLoader = () => {
-    const { t } = useAppConfig();
+    // We handle t inside safely
     return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] w-full text-yellow-500">
             <Loader2 className="w-16 h-16 animate-spin mb-4 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
-            <p className="font-bold text-lg animate-pulse tracking-widest text-yellow-400/80">{t?.system?.loading || 'LOADING...'}</p>
+            <p className="font-bold text-lg animate-pulse tracking-widest text-yellow-400/80">LOADING...</p>
         </div>
     );
 };
@@ -63,6 +65,21 @@ const BanTimerDisplay = ({ targetTime }: { targetTime: number }) => {
     );
 };
 
+// --- AUTH GUARD ---
+const RequireAuth = ({ children }: { children?: React.ReactNode }) => {
+    const { isAuthenticated, t } = useAppConfig();
+    const location = useLocation();
+
+    if (!isAuthenticated) {
+        // Redirect them to the /login page, but save the current location they were
+        // trying to go to when they were redirected. This allows us to send them
+        // along to that page after they login, which is a nicer user experience.
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    return <>{children}</>;
+};
+
 // Logic Component to Handle Bans
 const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
     const location = useLocation();
@@ -81,7 +98,7 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
     useEffect(() => {
         try {
             const navEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
-            if (navEntry && navEntry.type === 'reload' && location.pathname !== '/') {
+            if (navEntry && navEntry.type === 'reload' && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/signup') {
                 sessionStorage.clear();
                 window.location.replace('/');
             }
@@ -183,9 +200,9 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
             return;
         }
 
-        // 3. Sequence Check (تعديل: إعادة توجيه بدلاً من الحظر)
-        // إذا قام مستخدم جديد بفتح رابط صفحة داخلية، نقوم بتوجيهه للرئيسية ليبدأ من جديد
-        if (location.pathname !== '/') {
+        // 3. Sequence Check (Redirect if internal page accessed without context)
+        const publicPaths = ['/login', '/signup'];
+        if (location.pathname !== '/' && !publicPaths.includes(location.pathname)) {
             const sessionActive = sessionStorage.getItem('session_active');
             const isStep1Violation = location.pathname === '/step-1' && !sessionActive;
             const isStep2Violation = location.pathname === '/step-2' && !sessionStorage.getItem('step1_completed');
@@ -193,8 +210,6 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
             const isFinalViolation = location.pathname === '/destination' && !sessionStorage.getItem('step3_completed');
 
             if (isStep1Violation || isStep2Violation || isStep3Violation || isFinalViolation) {
-                // إصلاح: لا تحظر المستخدم، بل أعد توجيهه للصفحة الرئيسية
-                // هذا يحل مشكلة الروابط المشتركة مع مستخدمين جدد
                 window.location.replace('/');
             }
         }
@@ -229,7 +244,6 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
         );
     }
 
-    // Combined Block/Ban Screen
     if (banState === 'banned' || banState === 'shortener') {
         return (
             <div className={`min-h-[60vh] flex flex-col items-center justify-center p-6 text-center w-full ${lang === 'ar' ? 'rtl' : 'ltr'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
@@ -273,11 +287,35 @@ const AnimatedRoutes = () => {
         <AnimatePresence mode="wait">
             <Suspense fallback={<PageLoader />}>
                 <Routes location={location} key={location.pathname}>
-                    <Route path="/" element={<HomePage />} />
-                    <Route path="/step-1" element={<InfoPage />} />
-                    <Route path="/step-2" element={<FAQPage />} />
-                    <Route path="/step-3" element={<TimerPage />} />
-                    <Route path="/destination" element={<FinalPage />} />
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/signup" element={<SignupPage />} />
+                    
+                    {/* Protected Routes */}
+                    <Route path="/" element={
+                        <RequireAuth>
+                            <HomePage />
+                        </RequireAuth>
+                    } />
+                    <Route path="/step-1" element={
+                        <RequireAuth>
+                            <InfoPage />
+                        </RequireAuth>
+                    } />
+                    <Route path="/step-2" element={
+                        <RequireAuth>
+                            <FAQPage />
+                        </RequireAuth>
+                    } />
+                    <Route path="/step-3" element={
+                        <RequireAuth>
+                            <TimerPage />
+                        </RequireAuth>
+                    } />
+                    <Route path="/destination" element={
+                        <RequireAuth>
+                            <FinalPage />
+                        </RequireAuth>
+                    } />
                 </Routes>
             </Suspense>
         </AnimatePresence>
@@ -325,17 +363,15 @@ const App: React.FC = () => {
       setIsAdmin(SecureStorage.isAdmin());
   }, []);
 
-  // AdBlock Detection Logic - Strict (Bans if found)
+  // AdBlock Detection Logic
   useEffect(() => {
     if (SecureStorage.isAdmin()) return;
 
     const detectAdBlock = async () => {
        let detected = false;
-       // Method 1: Check for Brave
        // @ts-ignore
        if (navigator.brave && await navigator.brave.isBrave()) detected = true;
 
-       // Method 2: Bait
        if (!detected) {
            const bait = document.createElement('div');
            bait.className = 'pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads text-ad-links ad-banner adsbox ad-blocker-bait banner_ad';
@@ -358,7 +394,6 @@ const App: React.FC = () => {
           document.body.removeChild(bait);
        }
 
-       // Method 3: Network Check
        if (!detected) {
            try {
                await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { method: 'HEAD', mode: 'no-cors' });
@@ -369,7 +404,6 @@ const App: React.FC = () => {
 
        if (detected) {
            setIsAdBlockActive(true);
-           // Apply persistent ban
            const endTime = Date.now() + 3600000;
            SecureStorage.setBan(endTime); 
            sendTelegramLog('BANNED', 'AdBlock Detected');
@@ -377,7 +411,6 @@ const App: React.FC = () => {
     };
 
     detectAdBlock();
-    // Re-check periodically
     const interval = setInterval(detectAdBlock, 5000); 
     return () => clearInterval(interval);
   }, []);
@@ -390,8 +423,7 @@ const App: React.FC = () => {
         const isPrivate = await SecureStorage.isIncognitoMode();
         if (isPrivate) {
             setIsIncognito(true);
-            // Apply Persistent Ban for Incognito
-            const endTime = Date.now() + (24 * 60 * 60 * 1000); // 24 Hours
+            const endTime = Date.now() + (24 * 60 * 60 * 1000); 
             SecureStorage.setBan(endTime);
             sendTelegramLog('BANNED', 'Incognito Mode Detected');
         }
@@ -399,7 +431,7 @@ const App: React.FC = () => {
     detectIncognito();
   }, []);
 
-  // Security Measures (DevTools & Right Click)
+  // Security Measures
   useEffect(() => {
     if (SecureStorage.isAdmin()) return;
 
@@ -459,9 +491,7 @@ const App: React.FC = () => {
 
   const t = translations[lang] || translations.en;
 
-  // BLOCK SCREEN: Incognito (Now renders ban screen if ban set, otherwise specific incognito msg)
   if (isIncognito) {
-      // Even if setBan logic runs, this visual block is immediate
     return (
         <div className={`min-h-screen flex flex-col items-center justify-center bg-black text-white p-6 text-center ${lang === 'ar' ? 'rtl' : 'ltr'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
             <div className="bg-zinc-900 border border-red-600 rounded-3xl p-10 max-w-lg shadow-[0_0_50px_rgba(220,38,38,0.3)]">
@@ -470,16 +500,11 @@ const App: React.FC = () => {
                 <p className="text-gray-300 text-lg font-bold leading-relaxed mb-6">
                     {t.incognito?.desc || "Please close Incognito mode."}
                 </p>
-                <div className="bg-red-950/50 p-4 rounded-xl border border-red-500/20 text-red-300 text-sm font-semibold">
-                    <ShieldAlert className="w-5 h-5 inline-block mx-2 mb-1" />
-                    Security requirement: Persistent storage access.
-                </div>
             </div>
         </div>
     );
   }
 
-  // BLOCK SCREEN: AdBlock
   if (isAdBlockActive) {
       return (
         <div className={`fixed inset-0 z-[99999] min-h-screen flex flex-col items-center justify-center bg-black text-white p-6 text-center ${lang === 'ar' ? 'rtl' : 'ltr'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
@@ -490,7 +515,7 @@ const App: React.FC = () => {
                     {t.adblock?.desc || "Please disable your Ad Blocker."}
                 </p>
                 <button onClick={() => window.location.reload()} className="bg-yellow-500 text-black font-black py-3 px-8 rounded-xl hover:bg-yellow-400 transition-colors w-full">
-                    {t.final?.msg?.react === 'Reaction' ? 'I Disabled It, Reload' : 'قمت بإغلاقه، تحديث الصفحة'}
+                    {t.final?.msg?.react === 'Reaction' ? 'Reload' : 'تحديث الصفحة'}
                 </button>
             </div>
         </div>
@@ -499,37 +524,38 @@ const App: React.FC = () => {
 
   return (
     <AppContext.Provider value={{ lang, setLang, toggleLang, isAdmin, t }}>
-      <HashRouter>
-        <div className={`min-h-screen flex flex-col font-sans bg-black text-yellow-400 selection:bg-yellow-400 selection:text-black ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
-          <Header />
-          
-          <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center justify-center relative">
-            <AnimatedRoutes />
-          </main>
-          
-          <Footer />
+      <AuthProvider>
+        <HashRouter>
+            <div className={`min-h-screen flex flex-col font-sans bg-black text-yellow-400 selection:bg-yellow-400 selection:text-black ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
+            <Header />
+            
+            <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center justify-center relative">
+                <AnimatedRoutes />
+            </main>
+            
+            <Footer />
 
-          {/* New Toast-style Security Warning - Text Only, Simple, Disappears */}
-          <AnimatePresence>
-            {showSecurityWarning && (
-                <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[10000] pointer-events-none w-full flex justify-center px-4">
-                    <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        transition={{ duration: 0.2 }}
-                        className="bg-zinc-900/95 text-white px-6 py-3 rounded-full shadow-lg border border-zinc-700/50 backdrop-blur-md max-w-xs text-center"
-                    >
-                         <span className="font-bold text-sm tracking-wide text-gray-200">
-                             {t.security?.desc || "Security Restriction"}
-                         </span>
-                    </motion.div>
-                </div>
-            )}
-          </AnimatePresence>
+            <AnimatePresence>
+                {showSecurityWarning && (
+                    <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[10000] pointer-events-none w-full flex justify-center px-4">
+                        <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            transition={{ duration: 0.2 }}
+                            className="bg-zinc-900/95 text-white px-6 py-3 rounded-full shadow-lg border border-zinc-700/50 backdrop-blur-md max-w-xs text-center"
+                        >
+                            <span className="font-bold text-sm tracking-wide text-gray-200">
+                                {t.security?.desc || "Security Restriction"}
+                            </span>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
-        </div>
-      </HashRouter>
+            </div>
+        </HashRouter>
+      </AuthProvider>
     </AppContext.Provider>
   );
 };
