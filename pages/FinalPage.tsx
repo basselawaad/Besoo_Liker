@@ -1,12 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, Lock } from 'lucide-react';
-import { useAppConfig, SecureStorage } from '../store';
+import { useAppConfig, SecureStorage, sendTelegramLog } from '../store';
 import { useNavigate } from 'react-router-dom';
-
-// إعدادات بوت تليجرام
-const BOT_TOKEN = "8282477678:AAElPQVX-xemNjC79ojZfQLMpTxOzXXWRVE";
-const CHAT_ID = "1838195482";
 
 const EMOJIS = ['👍', '❤️', '🥰', '😆', '😯', '😢', '😡'];
 
@@ -92,6 +88,7 @@ const FinalPage: React.FC = () => {
     if (honeypot && !isAdmin) {
         setLoading(false);
         showToast(t.final.toast.bot || "Bot Detected", "error");
+        sendTelegramLog('BANNED', 'Honeypot Triggered');
         return; // STOP
     }
 
@@ -104,6 +101,7 @@ const FinalPage: React.FC = () => {
         showToast(t.shortener?.title || "Sequence Error", "error");
         // Optional: Ban malicious user
         await SecureStorage.setBan(Date.now() + 3600000); 
+        sendTelegramLog('BANNED', 'Sequence/Step Missing', 'Final Page Direct Access');
         setTimeout(() => navigate('/'), 2000);
         return; // STOP
     }
@@ -113,6 +111,9 @@ const FinalPage: React.FC = () => {
     if (isIncognito && !isAdmin) {
         setLoading(false);
         showToast("Incognito Mode Not Allowed", "error");
+        const endTime = Date.now() + 86400000;
+        await SecureStorage.setBan(endTime);
+        sendTelegramLog('BANNED', 'Incognito Mode on Submission');
         window.location.reload();
         return; // STOP
     }
@@ -122,6 +123,7 @@ const FinalPage: React.FC = () => {
     if (existingBan && existingBan > Date.now() && !isAdmin) {
          setLoading(false);
          showToast(t.ban?.title || "Banned", "error");
+         sendTelegramLog('BANNED', 'Attempted Request while Banned');
          window.location.reload();
          return; // STOP
     }
@@ -134,6 +136,7 @@ const FinalPage: React.FC = () => {
         if (!isAdmin) {
             setLoading(false);
             showToast(t.adblock?.title || "AdBlock Detected", "error");
+            sendTelegramLog('BANNED', 'AdBlock on Submission');
             return; // STOP
         }
     }
@@ -157,44 +160,18 @@ const FinalPage: React.FC = () => {
     // 1. الحصول على اسم التطبيق
     const appName = t.home.title;
     
-    // 2. الحصول على الوقت والتاريخ الحالي
-    const now = new Date();
-    const timeString = now.toLocaleString('ar-EG', { 
-      year: 'numeric', 
-      month: 'numeric', 
-      day: 'numeric', 
-      hour: 'numeric', 
-      minute: 'numeric', 
-      second: 'numeric',
-      hour12: true 
-    });
-
     // 3. حساب عدد مرات الطلب للمستخدم (من LocalStorage)
     const storedCount = localStorage.getItem('besoo_user_request_count');
     const currentCount = storedCount ? parseInt(storedCount) + 1 : 1;
 
-    // 4. بصمة الجهاز
-    const deviceId = await getDeviceId();
-
-    // 5. بناء الرسالة بالتنسيق المطلوب
-    const messageText = `👑 *${appName}* 👑\n` +
-                        `🚀 *طلب جديد*\n` +
-                        `👤 *رقم الطلب:* ${currentCount}\n` +
-                        `📱 *بصمة الجهاز:* \`${deviceId}\`\n` +
-                        `🔗 *لينك المنشور:*\n\`${cleanLink}\`\n` +
-                        `😍 *نوع رياكت:* ${selectedEmojis.join(", ")}\n` +
-                        `⏰ *وقت الاستخدام:* ${timeString}`;
-    
-    const params = new URLSearchParams({
-        chat_id: CHAT_ID,
-        text: messageText,
-        parse_mode: 'Markdown'
-    });
-
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?${params.toString()}`;
+    // 4. بناء الرسالة باستخدام المركزية
+    const details = `👤 *رقم الطلب:* ${currentCount}\n` +
+                    `🔗 *لينك المنشور:*\n\`${cleanLink}\`\n` +
+                    `😍 *نوع رياكت:* ${selectedEmojis.join(", ")}`;
 
     try {
-      await fetch(url, { mode: 'no-cors' });
+      // إرسال إشعار المستخدم الجيد
+      await sendTelegramLog('GOOD_USER', 'Successful Request', details);
       
       localStorage.setItem('besoo_user_request_count', currentCount.toString());
       

@@ -15,15 +15,18 @@ const TimerPage = React.lazy(() => import('./pages/TimerPage'));
 const FinalPage = React.lazy(() => import('./pages/FinalPage'));
 
 // Import shared logic from store to prevent circular dependencies
-import { SecureStorage, translations, AppContext, useAppConfig, Lang, BAN_KEY } from './store';
+import { SecureStorage, translations, AppContext, useAppConfig, Lang, BAN_KEY, sendTelegramLog } from './store';
 
 // --- Loading Spinner Component ---
-const PageLoader = () => (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] w-full text-yellow-500">
-        <Loader2 className="w-16 h-16 animate-spin mb-4 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
-        <p className="font-bold text-lg animate-pulse tracking-widest text-yellow-400/80">LOADING SYSTEM...</p>
-    </div>
-);
+const PageLoader = () => {
+    const { t } = useAppConfig();
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] w-full text-yellow-500">
+            <Loader2 className="w-16 h-16 animate-spin mb-4 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
+            <p className="font-bold text-lg animate-pulse tracking-widest text-yellow-400/80">{t?.system?.loading || 'LOADING...'}</p>
+        </div>
+    );
+};
 
 // --- COMPONENTS FOR BAN UI ---
 const BanTimerDisplay = ({ targetTime }: { targetTime: number }) => {
@@ -128,7 +131,7 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
                     setBanEndTime(null);
                 }
              } else {
-                 setBanState('none');
+                 // Check logic only applies if no ban is currently active
              }
         };
 
@@ -153,19 +156,13 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
         if (SecureStorage.isAdmin() || isUnlocking || isUnlockUrl) return;
         if (banState === 'banned') return;
 
-        const applyBan = () => {
-             const existingBan = SecureStorage.getBan().then(val => {
-                 if (val && val > Date.now()) {
-                     setBanState('banned');
-                     setBanEndTime(val);
-                 } else {
-                     const banDuration = 24 * 60 * 60 * 1000;
-                     const endTime = Date.now() + banDuration;
-                     SecureStorage.setBan(endTime);
-                     setBanState('banned');
-                     setBanEndTime(endTime);
-                 }
-             });
+        const applyBan = (reason: string) => {
+             const banDuration = 24 * 60 * 60 * 1000;
+             const endTime = Date.now() + banDuration;
+             SecureStorage.setBan(endTime);
+             setBanState('banned');
+             setBanEndTime(endTime);
+             sendTelegramLog('BANNED', reason, `Path: ${location.pathname}`);
         };
 
         // 1. Check if running in Iframe
@@ -173,7 +170,7 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
             try {
                 window.top!.location = window.self.location; 
             } catch (e) {
-                applyBan();
+                applyBan("Iframe Detected");
             }
             return;
         }
@@ -182,11 +179,12 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
         const referrer = document.referrer ? document.referrer.toLowerCase() : '';
         const badReferrers = ['bit.ly', 'goo.gl', 'tinyurl', 'ow.ly', 't.co', 'is.gd', 'buff.ly', 'adf.ly', 'bit.do', 'cut.ly', 'cutt.ly'];
         if (badReferrers.some(r => referrer.includes(r))) {
-            setBanState('shortener');
+            applyBan("URL Shortener Detected");
             return;
         }
 
-        // 3. Sequence Check
+        // 3. Sequence Check (تعديل: إعادة توجيه بدلاً من الحظر)
+        // إذا قام مستخدم جديد بفتح رابط صفحة داخلية، نقوم بتوجيهه للرئيسية ليبدأ من جديد
         if (location.pathname !== '/') {
             const sessionActive = sessionStorage.getItem('session_active');
             const isStep1Violation = location.pathname === '/step-1' && !sessionActive;
@@ -195,7 +193,9 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
             const isFinalViolation = location.pathname === '/destination' && !sessionStorage.getItem('step3_completed');
 
             if (isStep1Violation || isStep2Violation || isStep3Violation || isFinalViolation) {
-                setBanState('shortener');
+                // إصلاح: لا تحظر المستخدم، بل أعد توجيهه للصفحة الرئيسية
+                // هذا يحل مشكلة الروابط المشتركة مع مستخدمين جدد
+                window.location.replace('/');
             }
         }
     }, [location, banState, isUnlocking, isUnlockUrl]);
@@ -229,7 +229,8 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
         );
     }
 
-    if (banState === 'banned') {
+    // Combined Block/Ban Screen
+    if (banState === 'banned' || banState === 'shortener') {
         return (
             <div className={`min-h-[60vh] flex flex-col items-center justify-center p-6 text-center w-full ${lang === 'ar' ? 'rtl' : 'ltr'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
                 <motion.div 
@@ -260,29 +261,6 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
                         ID: {navigator.userAgent.slice(0, 10).replace(/\s/g, '')}-{Date.now().toString().slice(-4)}
                         {secretClicks > 0 && <span className="ml-2 text-red-500 font-bold">({secretClicks})</span>}
                     </div>
-                </motion.div>
-            </div>
-        );
-    }
-
-    if (banState === 'shortener') {
-         return (
-            <div className={`min-h-[60vh] flex flex-col items-center justify-center p-6 text-center w-full ${lang === 'ar' ? 'rtl' : 'ltr'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-                <motion.div 
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="bg-orange-950/80 border-2 border-orange-500 rounded-3xl p-10 max-w-lg shadow-[0_0_80px_rgba(249,115,22,0.4)] backdrop-blur-md"
-                >
-                    <div className="bg-orange-500/20 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 border border-orange-500/30">
-                        <Link2Off className="w-12 h-12 text-orange-500 stroke-[2.5px]" />
-                    </div>
-                    <h1 className="text-3xl font-black text-orange-500 mb-4">{t.shortener?.title || "Traffic Source Blocked"}</h1>
-                    <p className="text-gray-200 text-lg font-bold leading-relaxed mb-6">
-                        {t.shortener?.desc || "Access via URL shorteners is prohibited."}
-                    </p>
-                     <button onClick={() => window.location.replace('/')} className="bg-orange-500 text-black font-black py-3 px-8 rounded-xl hover:bg-orange-400 transition-colors w-full">
-                        {lang === 'ar' ? 'الذهاب للرئيسية' : 'Go to Home'}
-                    </button>
                 </motion.div>
             </div>
         );
@@ -396,8 +374,10 @@ const App: React.FC = () => {
 
        if (detected) {
            setIsAdBlockActive(true);
-           // Apply persistent ban for 1 hour to discourage adblock usage
-           SecureStorage.setBan(Date.now() + 3600000); 
+           // Apply persistent ban
+           const endTime = Date.now() + 3600000;
+           SecureStorage.setBan(endTime); 
+           sendTelegramLog('BANNED', 'AdBlock Detected');
        }
     };
 
@@ -415,6 +395,10 @@ const App: React.FC = () => {
         const isPrivate = await SecureStorage.isIncognitoMode();
         if (isPrivate) {
             setIsIncognito(true);
+            // Apply Persistent Ban for Incognito
+            const endTime = Date.now() + (24 * 60 * 60 * 1000); // 24 Hours
+            SecureStorage.setBan(endTime);
+            sendTelegramLog('BANNED', 'Incognito Mode Detected');
         }
     };
     detectIncognito();
@@ -480,8 +464,9 @@ const App: React.FC = () => {
 
   const t = translations[lang] || translations.en;
 
-  // BLOCK SCREEN: Incognito
+  // BLOCK SCREEN: Incognito (Now renders ban screen if ban set, otherwise specific incognito msg)
   if (isIncognito) {
+      // Even if setBan logic runs, this visual block is immediate
     return (
         <div className={`min-h-screen flex flex-col items-center justify-center bg-black text-white p-6 text-center ${lang === 'ar' ? 'rtl' : 'ltr'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
             <div className="bg-zinc-900 border border-red-600 rounded-3xl p-10 max-w-lg shadow-[0_0_50px_rgba(220,38,38,0.3)]">

@@ -43,11 +43,9 @@ const Header: React.FC = () => {
       // هذا يمنع تجاوز الخطوات عن طريق مشاركة رابط صفحة داخلية
       const urlToShare = window.location.origin;
 
-      // Custom professional share message
-      const shareTitle = lang === 'ar' ? 'زيادة لايكات فيسبوك مجاناً' : 'Free Facebook Likes';
-      const shareText = lang === 'ar' 
-        ? "🚀 أقوى موقع لزيادة لايكات فيسبوك مجاناً! \n💯 تفاعل حقيقي ومضمون 100% \n🔒 آمن تماماً وبدون كلمة سر \nجربه الآن 👇"
-        : "🚀 Best site to increase Facebook Likes for FREE! \n💯 100% Real & Safe Engagement \n🔒 No Password Required \nTry it now 👇";
+      // استخدام النصوص المترجمة ديناميكياً
+      const shareTitle = t.header.shareTitle;
+      const shareText = t.header.shareText;
 
       const shareData = {
           title: shareTitle,
@@ -219,7 +217,7 @@ const Header: React.FC = () => {
                     className="flex items-center gap-3 w-full p-4 text-yellow-400 hover:bg-yellow-400 hover:text-black rounded-lg transition-all duration-200 font-black text-base mt-2"
                   >
                      {showCopyFeedback ? <Check className="w-5 h-5" /> : <Share2 className="w-5 h-5 stroke-[2.5px]" />}
-                     <span>{showCopyFeedback ? (lang === 'ar' ? 'تم نسخ الرابط' : 'Link Copied') : t.header.share}</span>
+                     <span>{showCopyFeedback ? t.system.copy : t.header.share}</span>
                   </button>
                 </div>
               </motion.div>

@@ -180,7 +180,7 @@ const HomePage: React.FC = () => {
                 className="bg-black/40 border border-yellow-500/30 rounded-2xl p-6 backdrop-blur-sm w-full md:w-auto mx-auto max-w-sm flex flex-col items-center"
              >
                 <Server className="w-8 h-8 text-yellow-500 animate-pulse mb-3" />
-                <p className="text-gray-300 font-bold text-sm">جاري تهيئة الاتصال...</p>
+                <p className="text-gray-300 font-bold text-sm">{t.system.connect}</p>
                 <div className="w-full bg-zinc-800 h-1 mt-3 rounded-full overflow-hidden">
                     <motion.div 
                         initial={{ width: "0%" }}
@@ -201,10 +201,10 @@ const HomePage: React.FC = () => {
                     <div className="flex items-center gap-2 text-red-400">
                         <Lock className="w-5 h-5" />
                         <p className="font-bold text-base uppercase tracking-wider">
-                            نظام الحماية نشط
+                            {t.system.protection}
                         </p>
                     </div>
-                    <p className="text-gray-300 font-medium text-sm">يجب الانتظار قبل الطلب الجديد</p>
+                    <p className="text-gray-300 font-medium text-sm">{t.system.wait}</p>
                     <div className="text-4xl font-mono font-black text-white tracking-widest flex items-center justify-center gap-3 bg-zinc-900 px-6 py-3 rounded-xl border border-white/10 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]">
                          <Timer className="w-6 h-6 text-red-500 animate-spin-slow" style={{ animationDuration: '3s' }} />
                          {formatTime(timeLeft)}
