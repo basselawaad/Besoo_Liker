@@ -112,7 +112,7 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
         }
     };
 
-    // --- REAL-TIME BAN MONITORING (With Fingerprint) ---
+    // --- REAL-TIME BAN MONITORING (With Fingerprint & IndexedDB) ---
     useEffect(() => {
         if (isUnlocking || isUnlockUrl || SecureStorage.isAdmin()) return;
 
@@ -133,7 +133,7 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
         };
 
         checkBanStatus();
-        const intervalId = setInterval(checkBanStatus, 1000);
+        const intervalId = setInterval(checkBanStatus, 2000); // Check regularly
 
         const handleStorageChange = (e: StorageEvent) => {
             if (e.key === null || e.key.includes(BAN_KEY) || e.key.includes("sys")) {
@@ -186,18 +186,16 @@ const RouteGuard = ({ children }: { children?: React.ReactNode }) => {
             return;
         }
 
-        // 3. Sequence Check (Prevent skipping steps or copying links)
+        // 3. Sequence Check
         if (location.pathname !== '/') {
             const sessionActive = sessionStorage.getItem('session_active');
-            
-            // تحقق صارم من مفاتيح الجلسة
             const isStep1Violation = location.pathname === '/step-1' && !sessionActive;
             const isStep2Violation = location.pathname === '/step-2' && !sessionStorage.getItem('step1_completed');
             const isStep3Violation = location.pathname === '/step-3' && !sessionStorage.getItem('step2_completed');
             const isFinalViolation = location.pathname === '/destination' && !sessionStorage.getItem('step3_completed');
 
             if (isStep1Violation || isStep2Violation || isStep3Violation || isFinalViolation) {
-                setBanState('shortener'); // Show Shortener/Direct access block message
+                setBanState('shortener');
             }
         }
     }, [location, banState, isUnlocking, isUnlockUrl]);
@@ -315,7 +313,6 @@ const AnimatedRoutes = () => {
 };
 
 const App: React.FC = () => {
-  // دالة الكشف التلقائي عن اللغة
   const getInitialLang = (): Lang => {
     const storedLang = localStorage.getItem('besoo_app_lang');
     if (storedLang && translations[storedLang as Lang]) {
@@ -337,7 +334,6 @@ const App: React.FC = () => {
   const [isAdBlockActive, setIsAdBlockActive] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // تحديث اللغة وحفظها
   const setLang = (newLang: Lang) => {
       setLangState(newLang);
       localStorage.setItem('besoo_app_lang', newLang);
@@ -352,30 +348,27 @@ const App: React.FC = () => {
     document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
   }, [lang]);
 
-  // تحديث حالة الأدمن عند التحميل
   useEffect(() => {
       setIsAdmin(SecureStorage.isAdmin());
   }, []);
 
-  // AdBlock Detection Logic
+  // AdBlock Detection Logic - Strict (Bans if found)
   useEffect(() => {
     if (SecureStorage.isAdmin()) return;
 
     const detectAdBlock = async () => {
+       let detected = false;
        // Method 1: Check for Brave
        // @ts-ignore
-       if (navigator.brave && await navigator.brave.isBrave()) {
-           setIsAdBlockActive(true);
-           return;
-       }
+       if (navigator.brave && await navigator.brave.isBrave()) detected = true;
 
        // Method 2: Bait
-       const bait = document.createElement('div');
-       bait.className = 'pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads text-ad-links ad-banner adsbox ad-blocker-bait banner_ad';
-       bait.style.cssText = 'height: 1px !important; width: 1px !important; position: absolute !important; left: -9999px !important; top: -9999px !important;';
-       document.body.appendChild(bait);
+       if (!detected) {
+           const bait = document.createElement('div');
+           bait.className = 'pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads text-ad-links ad-banner adsbox ad-blocker-bait banner_ad';
+           bait.style.cssText = 'height: 1px !important; width: 1px !important; position: absolute !important; left: -9999px !important; top: -9999px !important;';
+           document.body.appendChild(bait);
 
-       const checkBait = () => {
            if (
               bait.offsetParent === null || 
               bait.offsetHeight === 0 || 
@@ -387,28 +380,30 @@ const App: React.FC = () => {
               window.getComputedStyle(bait).display === 'none' ||
               window.getComputedStyle(bait).visibility === 'hidden'
           ) {
-              setIsAdBlockActive(true);
+              detected = true;
           }
-       };
-
-       setTimeout(() => {
-          checkBait();
           document.body.removeChild(bait);
-       }, 200);
+       }
 
        // Method 3: Network Check
-       try {
-           await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { 
-               method: 'HEAD', 
-               mode: 'no-cors' 
-           });
-       } catch (e) {
+       if (!detected) {
+           try {
+               await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { method: 'HEAD', mode: 'no-cors' });
+           } catch (e) {
+               detected = true;
+           }
+       }
+
+       if (detected) {
            setIsAdBlockActive(true);
+           // Apply persistent ban for 1 hour to discourage adblock usage
+           SecureStorage.setBan(Date.now() + 3600000); 
        }
     };
 
     detectAdBlock();
-    const interval = setInterval(detectAdBlock, 2000);
+    // Re-check periodically
+    const interval = setInterval(detectAdBlock, 5000); 
     return () => clearInterval(interval);
   }, []);
 
@@ -436,19 +431,13 @@ const App: React.FC = () => {
 
     const preventCopy = (e: ClipboardEvent) => { 
         const target = e.target as HTMLElement;
-        // Allow copy/cut only in inputs
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-            return;
-        }
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
         e.preventDefault(); 
     };
 
     const preventContext = (e: MouseEvent) => {
         const target = e.target as HTMLElement;
-        // Allow right-click ONLY in inputs/textareas to allow pasting
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-            return;
-        }
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
         e.preventDefault();
         triggerSecurityAlert();
     };
@@ -459,9 +448,7 @@ const App: React.FC = () => {
     
     document.addEventListener('selectstart', (e) => {
          const target = e.target as HTMLElement;
-         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-             e.preventDefault();
-         }
+         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') e.preventDefault();
     });
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -483,16 +470,11 @@ const App: React.FC = () => {
 
     document.addEventListener('keydown', handleKeyDown);
 
-    // تم حذف الحلقات التكرارية (Intervals) التي كانت تسبب ظهور التنبيه بشكل تلقائي
-    // الآن يظهر التنبيه فقط عند حدوث Interception للأزرار أعلاه
-
     return () => {
         document.removeEventListener('contextmenu', preventContext);
         document.removeEventListener('keydown', handleKeyDown);
         document.removeEventListener('copy', preventCopy);
         document.removeEventListener('cut', preventCopy);
-        
-        // Cleanup removed intervals is not needed as they are removed
     };
   }, []);
 

@@ -1,80 +1,170 @@
 import React, { createContext, useContext } from 'react';
 
 // --- Security Utilities ---
-// تحديث المفاتيح لنسخة (V7 Ultra Strict)
 export const TIMER_KEY = "__sys_integrity_token_FINAL_v7"; 
 export const BAN_KEY = "__sys_access_violation_FINAL_v7"; 
 export const ADMIN_KEY = "__sys_root_privilege_token"; 
 export const FINGERPRINT_KEY = "__sys_device_fp_v1";
 const SALT = "besoo_secure_hash_x99_v4_ultra_strict"; 
 
+// --- IndexedDB Helper for Persistent Ban ---
+const DB_NAME = 'BesooSystemDB';
+const DB_STORE = 'security_logs';
+
+const dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
+    if (typeof window === 'undefined') return;
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        if (!db.objectStoreNames.contains(DB_STORE)) {
+            db.createObjectStore(DB_STORE);
+        }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+});
+
+async function writeDB(key: string, value: string) {
+    try {
+        const db = await dbPromise;
+        const tx = db.transaction(DB_STORE, 'readwrite');
+        tx.objectStore(DB_STORE).put(value, key);
+    } catch (e) {}
+}
+
+async function readDB(key: string): Promise<string | undefined> {
+    try {
+        const db = await dbPromise;
+        return new Promise((resolve) => {
+            const tx = db.transaction(DB_STORE, 'readonly');
+            const request = tx.objectStore(DB_STORE).get(key);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => resolve(undefined);
+        });
+    } catch (e) { return undefined; }
+}
+
 export class SecureStorage {
-  // --- Fingerprinting Logic ---
+  // --- Audio Fingerprinting (Very Sticky) ---
+  static async getAudioFingerprint(): Promise<string> {
+      try {
+          const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+          if (!AudioContext) return "no_audio_ctx";
+
+          const context = new AudioContext();
+          const oscillator = context.createOscillator();
+          const analyser = context.createAnalyser();
+          const gain = context.createGain();
+          const scriptProcessor = context.createScriptProcessor(4096, 1, 1);
+
+          oscillator.type = 'triangle';
+          oscillator.frequency.value = 10000;
+          gain.gain.value = 0;
+          
+          oscillator.connect(gain);
+          gain.connect(analyser);
+          analyser.connect(scriptProcessor);
+          scriptProcessor.connect(context.destination);
+
+          return new Promise((resolve) => {
+              scriptProcessor.onaudioprocess = (bins) => {
+                  oscillator.stop();
+                  scriptProcessor.disconnect();
+                  context.close();
+                  
+                  // Hash the audio buffer
+                  const array = new Float32Array(bins.inputBuffer.length);
+                  bins.inputBuffer.copyFromChannel(array, 0);
+                  let hash = 0;
+                  for (let i = 0; i < array.length; i++) {
+                      hash += Math.abs(array[i]);
+                  }
+                  resolve("audio_" + hash.toString());
+              };
+              oscillator.start(0);
+          });
+      } catch (e) {
+          return "audio_error";
+      }
+  }
+
+  // --- Advanced Fingerprinting ---
   static async generateFingerprint(): Promise<string> {
     try {
         // 1. Canvas Fingerprint
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        if (!ctx) return "unknown_device";
-        
-        canvas.width = 200;
-        canvas.height = 50;
-        
-        ctx.textBaseline = "top";
-        ctx.font = "14px 'Arial'";
-        ctx.textBaseline = "alphabetic";
-        ctx.fillStyle = "#f60";
-        ctx.fillRect(125,1,62,20);
-        ctx.fillStyle = "#069";
-        ctx.fillText("Besoo_Liker_Secure", 2, 15);
-        ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
-        ctx.fillText("Protection", 4, 17);
-        
-        const canvasData = canvas.toDataURL();
+        let canvasData = "no_canvas";
+        if (ctx) {
+            canvas.width = 200;
+            canvas.height = 50;
+            ctx.textBaseline = "top";
+            ctx.font = "14px 'Arial'";
+            ctx.textBaseline = "alphabetic";
+            ctx.fillStyle = "#f60";
+            ctx.fillRect(125,1,62,20);
+            ctx.fillStyle = "#069";
+            ctx.fillText("Besoo_Liker_Secure_v2", 2, 15);
+            ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+            ctx.fillText("Protection", 4, 17);
+            canvasData = canvas.toDataURL();
+        }
 
-        // 2. Hardware Info
+        // 2. Audio Fingerprint
+        const audioData = await SecureStorage.getAudioFingerprint();
+
+        // 3. Hardware & Screen
         const screenInfo = `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`;
         const hardwareConcurrency = navigator.hardwareConcurrency || "unknown";
         const deviceMemory = (navigator as any).deviceMemory || "unknown";
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const language = navigator.language;
-        const userAgent = navigator.userAgent;
+        const platform = navigator.platform;
 
-        // 3. Combine & Hash
-        const rawString = `${canvasData}|${screenInfo}|${hardwareConcurrency}|${deviceMemory}|${timezone}|${language}|${userAgent}`;
+        // 4. Combine & Hash
+        const rawString = `${canvasData}|${audioData}|${screenInfo}|${hardwareConcurrency}|${deviceMemory}|${timezone}|${language}|${platform}`;
         
-        // Simple Hash Function (DJB2)
+        // Robust Hash (DJB2 variant)
         let hash = 5381;
         for (let i = 0; i < rawString.length; i++) {
-            hash = (hash * 33) ^ rawString.charCodeAt(i);
+            hash = ((hash << 5) + hash) + rawString.charCodeAt(i);
         }
         return (hash >>> 0).toString(16);
 
     } catch (e) {
-        return "fallback_fingerprint_" + Date.now();
+        return "fallback_fp_" + Date.now();
     }
   }
 
-  // --- Strict Incognito Detection ---
+  // --- Strict Incognito Detection (Quota & FileSystem) ---
   static async isIncognitoMode(): Promise<boolean> {
       if (typeof window === 'undefined') return false;
       if (SecureStorage.isAdmin()) return false;
 
-      // Check 1: Storage Quota (Standard for Chrome/Firefox)
+      // Check 1: Storage Quota (Modern Standard)
+      // Incognito mode usually has a cap (e.g. 100MB or 10% of disk) which is distinct from normal mode
       try {
           if ('storage' in navigator && 'estimate' in navigator.storage) {
               const { quota } = await navigator.storage.estimate();
-              // Incognito usually has a much lower quota limit (e.g. < 120MB)
+              // If quota is suspiciously low (less than 120MB), it's likely Incognito
               if (quota && quota < 120000000) return true;
           }
       } catch (e) {}
 
-      // Check 2: Try/Catch LocalStorage (Safari/Old Browsers)
+      // Check 2: Firefox Private Mode (IndexedDB Error)
+      try {
+          const db = indexedDB.open("test");
+          db.onerror = function() { return true; };
+      } catch (e) {
+          return true;
+      }
+
+      // Check 3: Safari Private (LocalStorage write test)
       try {
           localStorage.setItem('__test_incognito__', '1');
           localStorage.removeItem('__test_incognito__');
       } catch (e) {
-          return true; // If we can't write to LS, treat as Incognito/Block
+          return true; // Safari throws error in Private mode
       }
 
       return false;
@@ -130,11 +220,12 @@ export class SecureStorage {
     document.cookie = `${TIMER_KEY}=; path=/; max-age=0`;
   }
   
-  static removeBan() {
+  static async removeBan() {
       if (typeof window === 'undefined') return;
       localStorage.removeItem(BAN_KEY);
       localStorage.removeItem(FINGERPRINT_KEY); 
       document.cookie = `${BAN_KEY}=; path=/; max-age=0`;
+      await writeDB(BAN_KEY, ""); // Clear from DB
       window.dispatchEvent(new Event("storage"));
   }
 
@@ -159,10 +250,12 @@ export class SecureStorage {
       localStorage.setItem(BAN_KEY, encrypted);
       // 2. Cookie
       document.cookie = `${BAN_KEY}=${encrypted}; path=/; max-age=86400; SameSite=Strict`;
+      // 3. IndexedDB (Persistent)
+      await writeDB(BAN_KEY, encrypted);
       
-      // 3. Fingerprint Ban (Most Important)
+      // 4. Fingerprint Ban (Persistent Identity)
       const fp = await SecureStorage.generateFingerprint();
-      // Store in a way that attempts to persist
+      // We save the fingerprint as BANNED in the local storage logic
       localStorage.setItem(`${FINGERPRINT_KEY}_${fp}`, encrypted);
   }
 
@@ -170,7 +263,7 @@ export class SecureStorage {
       if (typeof window === 'undefined') return null;
       if (SecureStorage.isAdmin()) return null;
 
-      // Check 1: Fingerprint (Primary)
+      // Check 1: Fingerprint (Primary identity check)
       const fp = await SecureStorage.generateFingerprint();
       const fpBan = localStorage.getItem(`${FINGERPRINT_KEY}_${fp}`);
       if (fpBan) {
@@ -178,17 +271,29 @@ export class SecureStorage {
           if (decrypted) return parseInt(decrypted);
       }
 
-      // Check 2: LocalStorage
+      // Check 2: IndexedDB (Persistent storage check)
+      const dbVal = await readDB(BAN_KEY);
+      if (dbVal) {
+          const decrypted = SecureStorage.decrypt(dbVal);
+          if (decrypted) return parseInt(decrypted);
+      }
+
+      // Check 3: LocalStorage
       let val = localStorage.getItem(BAN_KEY);
       
-      // Check 3: Cookies
+      // Check 4: Cookies
       if (!val) {
           const match = document.cookie.match(new RegExp('(^| )' + BAN_KEY + '=([^;]+)'));
           if (match) val = match[2];
       }
 
       const decrypted = SecureStorage.decrypt(val);
-      return decrypted ? parseInt(decrypted) : null;
+      if (decrypted) {
+          // If found in weak storage, reinforce it in strong storage (IndexedDB)
+          writeDB(BAN_KEY, val!);
+          return parseInt(decrypted);
+      }
+      return null;
   }
 }
 
@@ -296,12 +401,12 @@ export const translations = {
     },
     ban: {
         title: "تم حظر الوصول",
-        desc: "تم اكتشاف نشاط مريب أو محاولة استخدام الموقع مرتين. الحماية مفعلة.",
+        desc: "تم اكتشاف نشاط مريب أو انتهاك للشروط. الحظر مرتبط ببصمة جهازك.",
         timer: "ينتهي الحظر خلال:"
     },
     adblock: {
         title: "تم كشف حظر الإعلانات",
-        desc: "يرجى تعطيل AdBlock أو Brave Shield للمتابعة. المتصفحات التي تحجب السكربتات غير مدعومة."
+        desc: "يرجى تعطيل AdBlock أو Brave Shield للمتابعة."
     },
     shortener: {
         title: "دخول غير مصرح به",
