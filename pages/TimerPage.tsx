@@ -53,7 +53,7 @@ const TimerPage: React.FC = () => {
         
         <div className="text-center mb-6">
             <h1 className="text-2xl md:text-3xl font-black text-yellow-400 mb-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-                {t.timer.faqTitle}
+                {t.timer.faqTitle} - Besoo Liker
             </h1>
         </div>
 

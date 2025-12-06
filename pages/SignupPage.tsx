@@ -48,6 +48,7 @@ const SignupPage: React.FC = () => {
         provider: 'google',
         options: {
             // العودة إلى الرابط الرئيسي لتجنب مشاكل التوجيه في Vercel مع HashRouter
+            // Vercel يحتاج هذا الرابط ليكون موجوداً في Authorized redirect URIs في Google Cloud
             redirectTo: 'https://besooliker.vercel.app',
         }
     });
