@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Loader2, Star, ShieldCheck, Zap, MousePointerClick, Clock, Target, Users } from 'lucide-react';
+import { ArrowLeft, Loader2, Link as LinkIcon, AlertCircle } from 'lucide-react';
 import { useAppConfig } from '../store';
+
+const AdPlaceholder = ({ title }: { title: string }) => (
+    <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-lg h-32 flex flex-col items-center justify-center relative overflow-hidden group">
+        <div className="absolute top-2 right-2 bg-zinc-800 text-zinc-500 text-[10px] px-2 py-0.5 rounded">Ad</div>
+        <div className="text-zinc-600 font-bold text-sm uppercase tracking-widest group-hover:text-zinc-500 transition-colors">{title}</div>
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+    </div>
+);
 
 const InfoPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,76 +34,76 @@ const InfoPage: React.FC = () => {
     }
   };
 
-  const features = [
-    { icon: <Zap className="w-5 h-5 text-yellow-400" />, title: t.info.feat1Title, desc: t.info.feat1Desc },
-    { icon: <ShieldCheck className="w-5 h-5 text-green-400" />, title: t.info.feat2Title, desc: t.info.feat2Desc },
-    { icon: <MousePointerClick className="w-5 h-5 text-blue-400" />, title: t.info.feat3Title, desc: t.info.feat3Desc },
-    { icon: <Clock className="w-5 h-5 text-red-400" />, title: t.info.feat4Title, desc: t.info.feat4Desc },
-    { icon: <Target className="w-5 h-5 text-purple-400" />, title: t.info.feat5Title, desc: t.info.feat5Desc },
-    { icon: <Users className="w-5 h-5 text-orange-400" />, title: t.info.feat6Title, desc: t.info.feat6Desc }
-  ];
-
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className="w-full max-w-2xl"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      className="w-full max-w-lg"
     >
-      <div className="bg-zinc-950/80 backdrop-blur-md rounded-3xl p-6 md:p-8 shadow-[0_0_30px_rgba(234,179,8,0.15)] border border-yellow-600/30 relative overflow-hidden flex flex-col h-full">
+      <div className="bg-zinc-950/90 backdrop-blur-xl rounded-2xl p-6 shadow-2xl border border-yellow-600/20 relative overflow-hidden flex flex-col items-center">
         
-        {/* Header Content */}
-        <div className="text-center mb-8">
-            <h1 className="text-2xl md:text-3xl font-black text-yellow-400 mb-4 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-                {t.info.welcomeTitle}
-            </h1>
-            <p className="text-white font-bold text-lg mb-4">{t.info.welcomeSub}</p>
-            <p className="text-gray-300 text-sm leading-relaxed max-w-lg mx-auto font-medium">
-                {t.info.welcomeDesc}
-            </p>
+        {/* Header - Shortener Style */}
+        <div className="w-full flex items-center justify-between mb-6 border-b border-zinc-800 pb-4">
+             <div className="flex items-center gap-2">
+                 <LinkIcon className="w-5 h-5 text-yellow-500" />
+                 <span className="font-black text-white text-lg tracking-wide">Besoo Liker</span>
+             </div>
+             <span className="text-xs font-bold bg-yellow-500/10 text-yellow-500 px-3 py-1 rounded-full border border-yellow-500/20">
+                {t.shortener?.step1 || "Step 1/3"}
+             </span>
         </div>
 
-        {/* Features List */}
-        <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 ${lang === 'ar' ? 'text-right' : 'text-left'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-            {features.map((feat, idx) => (
-                <div key={idx} className="bg-white/5 p-4 rounded-xl border border-white/5 hover:border-yellow-500/30 transition-colors">
-                    <div className="flex items-center gap-2 mb-2">
-                        {feat.icon}
-                        <h3 className="font-bold text-yellow-200 text-sm">{feat.title}</h3>
-                    </div>
-                    <p className="text-gray-400 text-xs leading-5 font-medium">
-                        {feat.desc}
-                    </p>
-                </div>
-            ))}
-        </div>
+        {/* Content */}
+        <div className="w-full text-center space-y-6">
+            
+            <h2 className="text-xl font-bold text-gray-200">
+                {t.shortener?.prep || "Preparing your link..."}
+            </h2>
 
-        {/* Timer & Button Area */}
-        <div className="mt-auto border-t border-white/10 pt-6 flex flex-col items-center gap-4">
-            <div className="flex items-center gap-3 bg-black/40 px-6 py-2 rounded-full border border-yellow-500/20">
-                <Loader2 className={`w-5 h-5 text-yellow-400 ${!canProceed ? 'animate-spin' : ''}`} />
-                <span className="text-yellow-400 font-black font-mono text-xl">
-                    {canProceed ? '0' : timeLeft}
-                </span>
-                <span className="text-gray-500 text-xs font-bold uppercase">{t.faq.seconds || "Seconds"}</span>
+            {/* Fake Ad 1 */}
+            <AdPlaceholder title={t.shortener?.ad || "Sponsored Advertisement"} />
+
+            {/* Timer Circle */}
+            <div className="relative w-32 h-32 mx-auto flex items-center justify-center">
+                 <svg className="w-full h-full transform -rotate-90">
+                    <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-zinc-800" />
+                    <circle 
+                        cx="64" cy="64" r="56" 
+                        stroke="currentColor" strokeWidth="8" 
+                        fill="transparent" 
+                        strokeDasharray={351}
+                        strokeDashoffset={351 - (351 * timeLeft) / 20}
+                        className={`text-yellow-500 transition-all duration-1000 ease-linear ${timeLeft === 0 ? 'text-green-500' : ''}`}
+                        strokeLinecap="round"
+                    />
+                 </svg>
+                 <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-3xl font-black text-white">{timeLeft}</span>
+                    <span className="text-[10px] text-gray-500 uppercase font-bold">{t.faq?.seconds}</span>
+                 </div>
             </div>
 
-            <button 
-                onClick={handleNextClick}
-                disabled={!canProceed}
-                className={`w-full max-w-md py-4 rounded-xl font-black text-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-xl ${
-                    canProceed ? 'bg-yellow-400 text-black hover:bg-yellow-300 hover:scale-[1.02] shadow-[0_0_20px_rgba(234,179,8,0.4)]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
-                }`}
-            >
-                {canProceed ? t.info.buttonReady : t.info.buttonWait}
-                {canProceed && (
-                    <>
-                        {lang === 'ar' ? <ArrowLeft className="w-6 h-6 stroke-[3px]" /> : <ArrowLeft className="w-6 h-6 stroke-[3px] rotate-180" />}
-                    </>
-                )}
-            </button>
-        </div>
+            {/* Fake Ad 2 */}
+            <AdPlaceholder title={t.shortener?.ad || "Sponsored Advertisement"} />
 
+            {/* Action Button */}
+            <div className="w-full pt-4">
+                <button 
+                    onClick={handleNextClick}
+                    disabled={!canProceed}
+                    className={`w-full py-4 rounded-xl font-black text-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+                        canProceed 
+                        ? 'bg-yellow-500 text-black hover:bg-yellow-400 hover:scale-[1.02] shadow-[0_0_20px_rgba(234,179,8,0.4)]' 
+                        : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                    }`}
+                >
+                    {canProceed ? (t.shortener?.next || "Next Step") : (t.shortener?.wait || "Please Wait")}
+                    {canProceed && (lang === 'ar' ? <ArrowLeft className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5 rotate-180" />)}
+                </button>
+            </div>
+
+        </div>
       </div>
     </motion.div>
   );

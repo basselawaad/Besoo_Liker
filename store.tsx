@@ -288,7 +288,7 @@ export class SecureStorage {
           return parseInt(decrypted);
       }
       return null;
-  }
+    }
 }
 
 // --- Translations Definition ---
@@ -355,11 +355,24 @@ const AR_TRANSLATIONS = {
       msg: { req: 'طلب جديد', link: 'الرابط', react: 'التفاعل', visitor: 'زائر' },
       ssl: 'اتصال آمن SSL'
     },
+    shortener: {
+        step1: "الخطوة 1 من 3",
+        step2: "الخطوة 2 من 3",
+        step3: "الخطوة 3 من 3",
+        prep: "جاري تجهيز الرابط...",
+        wait: "يرجى الانتظار",
+        ad: "إعلان ممول",
+        next: "الخطوة التالية",
+        get: "جلب الرابط",
+        secure: "رابط آمن",
+        generating: "جاري إنشاء الوجهة...",
+        ready: "الرابط جاهز!"
+    },
     security: { alert: 'تنبيه أمني', desc: 'عذراً، هذا الإجراء غير مسموح به حفاظاً على الأمان.' },
     incognito: { title: "وضع التصفح الخفي مرفوض", desc: "لأسباب أمنية، يمنع استخدام الموقع في الوضع المتخفي (Incognito). يرجى فتح الموقع في متصفح عادي." },
     ban: { title: "تم حظر الوصول", desc: "لقد قمت بمخالفه استخدام الموقع", timer: "ينتهي الحظر خلال:" },
     adblock: { title: "تم كشف حظر الإعلانات", desc: "يرجى تعطيل AdBlock للمتابعة." },
-    shortener: { title: "دخول غير مصرح به", desc: "يجب البدء من الصفحة الرئيسية." }
+    shortenerPage: { title: "دخول غير مصرح به", desc: "يجب البدء من الصفحة الرئيسية." }
 };
 
 const EN_TRANSLATIONS = {
@@ -416,11 +429,24 @@ const EN_TRANSLATIONS = {
       msg: { req: 'Request', link: 'Link', react: 'React', visitor: 'Visitor' },
       ssl: 'SSL Secure'
     },
+    shortener: {
+        step1: "Step 1 of 3",
+        step2: "Step 2 of 3",
+        step3: "Step 3 of 3",
+        prep: "Preparing your link...",
+        wait: "Please Wait",
+        ad: "Sponsored Ad",
+        next: "Next Step",
+        get: "Get Link",
+        secure: "Secure Link",
+        generating: "Generating Destination...",
+        ready: "Link is Ready!"
+    },
     security: { alert: 'Security Alert', desc: 'Action blocked for security reasons.' },
     incognito: { title: "Private Mode Detected", desc: "Please close Incognito mode to continue." },
     ban: { title: "Access Restricted", desc: "You have violated the site usage terms.", timer: "Lifted in:" },
     adblock: { title: "AdBlock Detected", desc: "Please disable AdBlock to continue." },
-    shortener: { title: "Direct Access Blocked", desc: "Please start from the home page." }
+    shortenerPage: { title: "Direct Access Blocked", desc: "Please start from the home page." }
 };
 
 export const translations = {
@@ -428,7 +454,7 @@ export const translations = {
   en: EN_TRANSLATIONS,
   // Add simplified fallbacks for other languages to avoid errors, pointing to English structure usually
   es: { ...EN_TRANSLATIONS, auth: { loginTitle: "Iniciar Sesión", signupTitle: "Crear Cuenta", email: "Correo", password: "Clave", confirmPassword: "Confirmar Clave", name: "Nombre", loginBtn: "Entrar", signupBtn: "Registrar", noAccount: "¿No tienes cuenta?", haveAccount: "¿Ya tienes cuenta?", errorEmpty: "Llenar todo", errorMatch: "Claves no coinciden", errorExists: "Correo existe", errorInvalid: "Invalido", successSignup: "Éxito", logout: "Salir", googleBtn: "Iniciar con Google" } } as any,
-  fr: { ...EN_TRANSLATIONS, auth: { loginTitle: "Connexion", signupTitle: "Créer Compte", email: "Email", password: "Mot de passe", confirmPassword: "Confirmer", name: "Nom", loginBtn: "Entrer", signupBtn: "Inscrire", noAccount: "Pas de compte ?", haveAccount: "Déjà un compte ?", errorEmpty: "Remplir tout", errorMatch: "Pas identique", errorExists: "Existe déjà", errorInvalid: "Invalide", successSignup: "Succès", logout: "Déconnexion", googleBtn: "Continuer avec Google" } } as any,
+  fr: { ...EN_TRANSLATIONS, auth: { loginTitle: "Connexion", signupTitle: "Créer Compte", email: "Email", password: "Mot de passe", confirmPassword: "Confirmer", name: "Nom", loginBtn: "Entrar", signupBtn: "Inscrire", noAccount: "Pas de compte ?", haveAccount: "Déjà un compte ?", errorEmpty: "Remplir tout", errorMatch: "Pas identique", errorExists: "Existe déjà", errorInvalid: "Invalide", successSignup: "Succès", logout: "Déconnexion", googleBtn: "Continuer avec Google" } } as any,
   de: { ...EN_TRANSLATIONS, auth: { loginTitle: "Anmelden", signupTitle: "Konto erstellen", email: "Email", password: "Pass", confirmPassword: "Bestätigen", name: "Name", loginBtn: "Login", signupBtn: "Registrieren", noAccount: "Kein Konto?", haveAccount: "Haben Konto?", errorEmpty: "Alles ausfüllen", errorMatch: "Nicht gleich", errorExists: "Existiert", errorInvalid: "Ungültig", successSignup: "Erfolg", logout: "Logout", googleBtn: "Mit Google anmelden" } } as any,
   ru: { ...EN_TRANSLATIONS, auth: { loginTitle: "Вход", signupTitle: "Создать", email: "Email", password: "Пароль", confirmPassword: "Подтвердить", name: "Имя", loginBtn: "Вход", signupBtn: "Рег.", noAccount: "Нет аккаунта?", haveAccount: "Есть аккаунт?", errorEmpty: "Заполните", errorMatch: "Не совпадает", errorExists: "Существует", errorInvalid: "Ошибка", successSignup: "Успех", logout: "Выход", googleBtn: "Войти через Google" } } as any,
   zh: { ...EN_TRANSLATIONS, auth: { loginTitle: "登录", signupTitle: "注册", email: "邮箱", password: "密码", confirmPassword: "确认密码", name: "姓名", loginBtn: "登录", signupBtn: "注册", noAccount: "没有账号？", haveAccount: "已有账号？", errorEmpty: "填满", errorMatch: "不匹配", errorExists: "已存在", errorInvalid: "无效", successSignup: "成功", logout: "登出", googleBtn: "通过 Google 登录" } } as any,
